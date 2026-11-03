@@ -13,20 +13,21 @@ import io
 import re
 import time
 from collections import deque
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass, field
 from urllib.parse import urljoin, urlparse, urlunparse
 from urllib.robotparser import RobotFileParser
 
 import requests
 
-from webscope.fetcher import FetchedPage, FetchError, fetch_bytes, fetch_page
+from webscope.fetcher import DEFAULT_TIMEOUT, FetchedPage, FetchError, fetch_bytes, fetch_page
 from webscope.models import PageCount
 from webscope.parsing import make_soup
 
 EventCallback = Callable[..., None]
 
 ROBOTS_AGENT = "webscope"
+MAX_CACHED_HTML = 200 * 1024
 _LOC_RE = re.compile(r"<loc>\s*(?:<!\[CDATA\[)?\s*(.*?)\s*(?:\]\]>)?\s*</loc>", re.I | re.S)
 _SITEMAP_INDEX_RE = re.compile(r"<sitemapindex[\s>]", re.I)
 _SKIP_EXTENSIONS = frozenset(
@@ -85,6 +86,26 @@ class CrawlOptions:
     delay: float = 0.3
     max_sitemaps: int = 25
     max_sitemap_depth: int = 2
+    timeout: float = DEFAULT_TIMEOUT
+
+
+@dataclass(frozen=True)
+class Robots:
+    """``robots.txt`` parseado y su texto (``None`` si no existe)."""
+
+    parser: RobotFileParser | None = None
+    text: str | None = None
+
+
+@dataclass(frozen=True)
+class CrawlResult:
+    """Conteo de páginas más lo descubierto en el camino (URLs y HTML ya descargado)."""
+
+    pages: PageCount
+    urls: tuple[str, ...] = ()
+    html: Mapping[str, str] = field(default_factory=dict)
+    robots: Robots = field(default_factory=Robots)
+    sitemap_found: bool = False
 
 
 def _noop(code: str, **params: object) -> None:
@@ -127,19 +148,30 @@ def origin_of(url: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+def fetch_robots(
+    origin: str,
+    session: requests.Session,
+    on_event: EventCallback = _noop,
+    timeout: float = DEFAULT_TIMEOUT,
+) -> Robots:
+    """Descarga y parsea ``robots.txt``; vacío si no existe (todo permitido)."""
+    url = f"{origin}/robots.txt"
+    body = fetch_bytes(url, session, timeout)
+    text = body.decode("utf-8", errors="replace") if body is not None else ""
+    if body is None or "<html" in text[:500].lower():
+        on_event("robots_missing")
+        return Robots()
+    parser = RobotFileParser(url)
+    parser.parse(text.splitlines())
+    on_event("robots_found", url=url)
+    return Robots(parser, text)
+
+
 def load_robots(
     origin: str, session: requests.Session, on_event: EventCallback = _noop
 ) -> RobotFileParser | None:
     """Descarga y parsea ``robots.txt``; ``None`` si no existe (todo permitido)."""
-    url = f"{origin}/robots.txt"
-    body = fetch_bytes(url, session)
-    if body is None:
-        on_event("robots_missing")
-        return None
-    parser = RobotFileParser(url)
-    parser.parse(body.decode("utf-8", errors="replace").splitlines())
-    on_event("robots_found", url=url)
-    return parser
+    return fetch_robots(origin, session, on_event).parser
 
 
 def _decompress(body: bytes) -> bytes:
@@ -180,7 +212,7 @@ def read_sitemaps(
             break
         visited.add(url)
         on_event("sitemap_try", url=url)
-        body = fetch_bytes(url, session)
+        body = fetch_bytes(url, session, options.timeout)
         if body is None:
             continue
         is_index, locs = parse_sitemap(body)
@@ -207,8 +239,21 @@ def crawl(
     on_event: EventCallback = _noop,
 ) -> PageCount:
     """Cuenta páginas siguiendo links internos (BFS) hasta ``options.max_pages``."""
+    return _crawl(home, session, robots, options, sleep=sleep, on_event=on_event).pages
+
+
+def _crawl(
+    home: FetchedPage,
+    session: requests.Session,
+    robots: RobotFileParser | None,
+    options: CrawlOptions,
+    *,
+    sleep: Callable[[float], None],
+    on_event: EventCallback,
+) -> CrawlResult:
     start = normalize_link(home.final_url) or home.final_url
     seen = {start}
+    visited: dict[str, str] = {}
     queue: deque[str] = deque()
     _enqueue(extract_links(home.html, home.final_url), seen, queue)
     count = 1
@@ -220,18 +265,20 @@ def crawl(
             continue
         sleep(options.delay)
         try:
-            page = fetch_page(url, session)
+            page = fetch_page(url, session, options.timeout)
         except FetchError:
             on_event("crawl_error", url=url)
             continue
         count += 1
+        visited[url] = page.html[:MAX_CACHED_HTML]
         on_event("crawl_page", n=count, max=options.max_pages, url=url)
         seen.add(normalize_link(page.final_url) or page.final_url)
         _enqueue(extract_links(page.html, page.final_url), seen, queue)
     at_least = bool(queue) and count >= options.max_pages
     if at_least:
         on_event("crawl_limit", max=options.max_pages)
-    return PageCount(count=count, source="crawl", at_least=at_least)
+    pages = PageCount(count=count, source="crawl", at_least=at_least)
+    return CrawlResult(pages, urls=(*visited, *queue), html=visited)
 
 
 def _enqueue(links: Iterable[str], seen: set[str], queue: deque[str]) -> None:
@@ -250,25 +297,43 @@ def count_pages(
     on_event: EventCallback = _noop,
 ) -> PageCount:
     """Cuenta las páginas del sitio: primero por sitemap y, si no hay, rastreando."""
+    return discover(home, session, options, sleep=sleep, on_event=on_event).pages
+
+
+def discover(
+    home: FetchedPage,
+    session: requests.Session,
+    options: CrawlOptions | None = None,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+    on_event: EventCallback = _noop,
+) -> CrawlResult:
+    """Como ``count_pages`` pero devuelve también URLs, HTML visitado y ``robots.txt``."""
     options = options or CrawlOptions()
     origin = origin_of(home.final_url)
-    robots = load_robots(origin, session, on_event)
-    declared = robots.site_maps() if robots is not None else None
+    robots = fetch_robots(origin, session, on_event, options.timeout)
+    declared = robots.parser.site_maps() if robots.parser is not None else None
     sitemap_urls = list(declared or [f"{origin}/sitemap.xml"])
     pages, truncated = read_sitemaps(sitemap_urls, session, options, on_event)
     domain = site_key(urlparse(home.final_url).hostname)
     pages = {page for page in pages if site_key(urlparse(page).hostname) == domain}
     if pages:
-        return PageCount(count=len(pages), source="sitemap", at_least=truncated)
+        count = PageCount(count=len(pages), source="sitemap", at_least=truncated)
+        return CrawlResult(count, urls=tuple(sorted(pages)), robots=robots, sitemap_found=True)
     on_event("sitemap_missing")
-    return crawl(home, session, robots, options, sleep=sleep, on_event=on_event)
+    found = _crawl(home, session, robots.parser, options, sleep=sleep, on_event=on_event)
+    return CrawlResult(found.pages, found.urls, found.html, robots, sitemap_found=False)
 
 
 __all__ = [
     "CrawlOptions",
+    "CrawlResult",
+    "Robots",
     "count_pages",
     "crawl",
+    "discover",
     "extract_links",
+    "fetch_robots",
     "normalize_link",
     "parse_sitemap",
     "read_sitemaps",

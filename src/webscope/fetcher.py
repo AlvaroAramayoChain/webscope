@@ -1,6 +1,8 @@
 """Descarga de páginas con ``requests``: timeouts, user-agent propio y errores claros.
 
-Es (junto a ``crawler``) el único módulo que hace red. Los errores se convierten en
+Es (junto a ``crawler``) el único módulo que hace HTTP. Solo hace GET: la home, sus
+redirecciones, recursos auxiliares (``robots.txt``, sitemaps, ``security.txt``) y la
+versión ``http://`` para ver si redirige a HTTPS. Los errores se convierten en
 ``FetchError`` con un ``code`` estable que ``report``/``cli`` traducen al idioma de
 la interfaz; nunca se muestra un stack trace al usuario.
 """
@@ -16,6 +18,7 @@ from urllib.parse import urlparse
 import requests
 
 from webscope import __version__
+from webscope.models import Redirect
 
 DEFAULT_TIMEOUT = 10.0
 MAX_BYTES = 5 * 1024 * 1024
@@ -48,6 +51,25 @@ class FetchedPage:
     html: str
     headers: dict[str, str] = field(default_factory=dict)
     elapsed_ms: int = 0
+    redirects: tuple[Redirect, ...] = ()
+    set_cookies: tuple[str, ...] = ()
+    peer_ip: str | None = None
+
+
+@dataclass(frozen=True)
+class Resource:
+    """Un recurso auxiliar descargado (cualquier status), con headers en minúsculas."""
+
+    url: str
+    final_url: str
+    status_code: int
+    body: bytes
+    headers: dict[str, str] = field(default_factory=dict)
+    redirects: tuple[Redirect, ...] = ()
+
+    @property
+    def text(self) -> str:
+        return decode_html(self.body, self.headers.get("content-type", ""))
 
 
 def create_session() -> requests.Session:
@@ -144,6 +166,32 @@ def _get(session: requests.Session, url: str, timeout: float) -> requests.Respon
         raise _translate_request_error(exc, url, timeout) from exc
 
 
+def _redirects(response: requests.Response) -> tuple[Redirect, ...]:
+    return tuple(Redirect(r.url, r.status_code) for r in response.history)
+
+
+def _set_cookies(response: requests.Response) -> tuple[str, ...]:
+    """Cada ``Set-Cookie`` por separado (``requests`` los une con comas)."""
+    getlist = getattr(getattr(response.raw, "headers", None), "getlist", None)
+    if callable(getlist):
+        return tuple(str(value) for value in getlist("Set-Cookie"))
+    value = response.headers.get("Set-Cookie")
+    return (value,) if value else ()
+
+
+def _peer_ip(response: requests.Response) -> str | None:
+    """IP efectivamente usada en la conexión (si ``urllib3`` la expone)."""
+    for attr in ("connection", "_connection"):
+        sock = getattr(getattr(response.raw, attr, None), "sock", None)
+        if sock is None:
+            continue
+        try:
+            return str(sock.getpeername()[0])
+        except (OSError, AttributeError, IndexError, TypeError):
+            return None
+    return None
+
+
 def fetch_page(
     url: str, session: requests.Session | None = None, timeout: float = DEFAULT_TIMEOUT
 ) -> FetchedPage:
@@ -151,6 +199,7 @@ def fetch_page(
     session = session or create_session()
     started = time.perf_counter()
     response = _get(session, url, timeout)
+    peer_ip = _peer_ip(response)
     with response:
         if response.status_code >= 400:
             raise FetchError(
@@ -170,6 +219,9 @@ def fetch_page(
         html=decode_html(body, content_type),
         headers={k.lower(): v for k, v in response.headers.items()},
         elapsed_ms=int((time.perf_counter() - started) * 1000),
+        redirects=_redirects(response),
+        set_cookies=_set_cookies(response),
+        peer_ip=peer_ip,
     )
 
 
@@ -188,3 +240,30 @@ def fetch_bytes(
             return _read_limited(response, limit=MAX_BYTES * 4)
         except requests.RequestException:
             return None
+
+
+def fetch_resource(
+    url: str,
+    session: requests.Session,
+    timeout: float = DEFAULT_TIMEOUT,
+    *,
+    limit: int = 256 * 1024,
+) -> Resource | None:
+    """GET de un recurso auxiliar con cualquier status; ``None`` si no hubo respuesta."""
+    try:
+        response = session.get(url, timeout=timeout, allow_redirects=True, stream=True)
+    except requests.RequestException:
+        return None
+    with response:
+        try:
+            body = _read_limited(response, limit=limit)
+        except requests.RequestException:
+            body = b""
+    return Resource(
+        url=url,
+        final_url=response.url or url,
+        status_code=response.status_code,
+        body=body,
+        headers={k.lower(): v for k, v in response.headers.items()},
+        redirects=_redirects(response),
+    )
