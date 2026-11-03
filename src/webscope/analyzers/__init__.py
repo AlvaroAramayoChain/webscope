@@ -1,4 +1,4 @@
-"""Analizadores puros: reciben HTML (y headers) y devuelven datos o códigos.
+"""Analizadores puros: reciben HTML, headers o registros ya obtenidos y devuelven datos o códigos.
 
 No hacen red ni conocen el idioma de la interfaz.
 """
