@@ -2,7 +2,7 @@ from collections.abc import Callable
 
 import pytest
 
-from webscope.analyzers.site_type import classify, confidence_for
+from webscope.analyzers.site_type import STRONG_APP_SIGNALS, classify, confidence_for
 
 
 def codes(html: str) -> set[str]:
@@ -55,3 +55,37 @@ def test_empty_html_defaults_to_low_confidence() -> None:
 )
 def test_confidence_thresholds(margin: int, expected: str) -> None:
     assert confidence_for(margin) == expected
+
+
+# --- Poco texto sin señales fuertes de app ---------------------------------------------
+
+
+def test_minimal_page_is_a_low_confidence_site(load_fixture: Callable[[str], str]) -> None:
+    result = classify(load_fixture("minimal.html"))
+    assert result.kind == "site"
+    assert result.confidence == "low"
+    # La señal de poco texto se sigue informando (sirve en --verbose).
+    assert "little_text" in {s.code for s in result.signals}
+    assert not {s.code for s in result.signals} & STRONG_APP_SIGNALS
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        '<div id="root"></div>',
+        '<link rel="manifest" href="/manifest.json">',
+        "<script>navigator.serviceWorker.register('/sw.js')</script>",
+        '<a href="/dashboard">Dashboard</a>',
+        '<script type="module" src="/assets/index-a1b2c3d4.js"></script>',
+    ],
+)
+def test_minimal_page_with_a_strong_signal_is_an_app(
+    load_fixture: Callable[[str], str], extra: str
+) -> None:
+    html = load_fixture("minimal.html").replace("</body>", f"{extra}</body>")
+    assert classify(html).kind == "app"
+
+
+def test_empty_html_is_never_an_app() -> None:
+    result = classify("")
+    assert (result.kind, result.confidence) == ("site", "low")

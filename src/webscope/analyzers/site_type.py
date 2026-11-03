@@ -114,6 +114,22 @@ def _site_signals(page: _Page) -> Iterator[Signal]:
         yield Signal("cms_generator", "site", 2)
 
 
+# Señales que por sí solas justifican decir "app web". Sin ninguna de ellas, una página
+# con poco texto se clasifica como sitio con confianza baja.
+STRONG_APP_SIGNALS = frozenset(
+    {
+        "spa_root",
+        "many_scripts",
+        "module_scripts",
+        "manifest",
+        "service_worker",
+        "app_routes",
+        "noscript_js",
+        "password_form",
+    }
+)
+
+
 def confidence_for(margin: int) -> Confidence:
     """Confianza según la diferencia de puntaje entre ``app`` y ``site``."""
     if margin >= 5:
@@ -133,9 +149,13 @@ def classify(html: str) -> SiteTypeResult:
     app_score = sum(s.weight for s in signals if s.target == "app")
     site_score = sum(s.weight for s in signals if s.target == "site")
     kind: SiteKind = "app" if app_score > site_score else "site"
+    confidence = confidence_for(abs(app_score - site_score))
+    if kind == "app" and not any(s.code in STRONG_APP_SIGNALS for s in signals):
+        # Poco texto por sí solo no alcanza (p. ej. example.com): sitio con confianza baja.
+        kind, confidence = "site", "low"
     return SiteTypeResult(
         kind=kind,
-        confidence=confidence_for(abs(app_score - site_score)),
+        confidence=confidence,
         app_score=app_score,
         site_score=site_score,
         signals=signals,
