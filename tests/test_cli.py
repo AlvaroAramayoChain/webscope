@@ -3,6 +3,7 @@ import re
 import socket
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -425,3 +426,29 @@ def test_partial_failure_keeps_exit_code_zero() -> None:
     result = invoke([URL, "--lang", "en", "--no-color"])
     assert result.exit_code == 0
     assert "not available (could not connect to the TLS port)" in result.stdout
+
+
+@pytest.mark.usefixtures("non_interactive")
+@pytest.mark.parametrize(
+    ("lang", "summary", "kind"),
+    [
+        ("es", "Indeterminada — This domain is for use", "Sitio web (confianza: baja)"),
+        ("en", "Undetermined — This domain is for use", "Website (confidence: low)"),
+    ],
+)
+def test_minimal_page_end_to_end(
+    mocked: responses.RequestsMock,
+    load_fixture: Callable[[str], str],
+    lang: str,
+    summary: str,
+    kind: str,
+) -> None:
+    mocked.get(
+        "https://minimal.example/",
+        body=load_fixture("minimal.html"),
+        headers={"Content-Type": "text/html"},
+    )
+    result = invoke(["minimal.example", "--lang", lang, "--no-color", "--brief"])
+    assert result.exit_code == 0, result.output
+    assert summary in result.stdout
+    assert kind in result.stdout

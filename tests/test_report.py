@@ -229,8 +229,34 @@ def test_summary_has_category_prefix() -> None:
         format_summary(result, "es") == "Tienda online (e-commerce) — Zapatillas con envío gratis"
     )
     assert format_summary(result, "en").startswith("Online store (e-commerce) — ")
+
+
+def test_undetermined_summary_keeps_the_format() -> None:
+    from webscope.models import CategoryResult, TopicResult
+
     unknown = TopicResult("Algo", CategoryResult("unknown", "low"))
-    assert format_summary(make_result(summary="Algo", topic=unknown), "es") == "Algo"
+    result = make_result(summary="Algo", topic=unknown)
+    assert format_summary(result, "es") == "Indeterminada — Algo"
+    assert format_summary(result, "en") == "Undetermined — Algo"
+    empty = make_result(summary="", topic=unknown)
+    assert format_summary(empty, "es") == "Indeterminada — sin descripción disponible"
+
+
+@pytest.mark.parametrize("code", ["unknown", "ecommerce"])
+def test_summary_is_clipped_to_200_chars(code: str) -> None:
+    from webscope.models import CategoryResult, TopicResult
+
+    long_text = "palabra " * 60
+    topic = TopicResult(long_text, CategoryResult(code, "low"))
+    summary = format_summary(make_result(summary=long_text, topic=topic), "es")
+    assert len(summary) <= 200
+    assert summary.endswith("…")
+    assert " — palabra" in summary
+
+
+def test_summary_without_topic_is_only_the_description() -> None:
+    # Resultados sin clasificar (p. ej. construidos a mano) no inventan una categoría.
+    assert format_summary(make_result(summary="Algo"), "en") == "Algo"
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])

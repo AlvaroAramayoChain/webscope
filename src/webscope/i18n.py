@@ -240,6 +240,7 @@ _ES: Final[dict[str, str]] = {
     "category.docs": "Documentación técnica",
     "category.landing": "Landing de producto",
     "category.unknown": "Categoría indeterminada",
+    "category.unknown_short": "Indeterminada",
     "category.value": "{name} (confianza: {confidence})",
     # Motivos de bloques no disponibles.
     "reason.local_host": "host local o IP privada",
@@ -577,6 +578,7 @@ _EN: Final[dict[str, str]] = {
     "category.docs": "Technical documentation",
     "category.landing": "Product landing page",
     "category.unknown": "Undetermined category",
+    "category.unknown_short": "Undetermined",
     "category.value": "{name} (confidence: {confidence})",
     "reason.local_host": "local host or private IP",
     "reason.dns_timeout": "DNS did not answer",

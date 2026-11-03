@@ -22,6 +22,7 @@ from rich.text import Text
 from webscope import __version__
 from webscope.analyzers.tech import CATEGORY_ORDER
 from webscope.analyzers.tls import is_expired
+from webscope.analyzers.topic import clip
 from webscope.dnsinfo import is_null_mx
 from webscope.fetcher import FetchError
 from webscope.i18n import t
@@ -104,16 +105,17 @@ def format_technologies(technologies: tuple[Technology, ...], lang: str) -> str:
 
 
 def format_summary(result: AnalysisResult, lang: str) -> str:
-    """``<Categoría> — <descripción>``; solo la descripción si la categoría es indeterminada."""
-    description = result.summary
+    """``<Categoría> — <descripción>`` (``Indeterminada — …`` si no hay categoría clara).
+
+    Sin ``topic`` (resultados construidos a mano, sin clasificar) queda solo la descripción.
+    """
     topic = result.topic
-    if topic is None or topic.category.code == "unknown":
-        return description or t("topic.none", lang)
-    label = t(f"category.{topic.category.code}", lang)
-    if not description:
-        return label
-    text = f"{label} — {description}"
-    return text if len(text) <= SUMMARY_CHARS else text[: SUMMARY_CHARS - 1].rstrip() + "…"
+    if topic is None:
+        return result.summary or t("topic.none", lang)
+    code = topic.category.code
+    label = t("category.unknown_short" if code == "unknown" else f"category.{code}", lang)
+    description = result.summary or t("topic.none", lang)
+    return clip(f"{label} — {description}", SUMMARY_CHARS)
 
 
 def format_error(error: FetchError, lang: str) -> str:
