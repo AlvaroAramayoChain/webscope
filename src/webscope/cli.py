@@ -15,10 +15,10 @@ from rich.markup import escape
 
 from webscope import __version__
 from webscope.config import load_language, save_language, system_language
-from webscope.core import analyze
-from webscope.fetcher import FetchError
+from webscope.core import AnalyzeOptions, analyze
+from webscope.fetcher import DEFAULT_TIMEOUT, FetchError
 from webscope.i18n import MENU_FALLBACK_LANG, SUPPORTED_LANGS, language_name, normalize_lang, t
-from webscope.report import MAX_WIDTH, format_error, format_event, render, to_json
+from webscope.report import MAX_WIDTH, format_error, format_event, render, to_json, to_markdown
 
 EXIT_OK = 0
 EXIT_NETWORK = 1
@@ -38,6 +38,26 @@ class RunOptions:
     verbose: bool = False
     no_color: bool = False
     change_lang: bool = False
+    brief: bool = False
+    markdown: bool = False
+    no_crawl: bool = False
+    rdap: bool = False
+    timeout: float = DEFAULT_TIMEOUT
+
+    @property
+    def machine_output(self) -> bool:
+        """``--json`` o ``--md``: salida para otras herramientas, sin menú ni spinner."""
+        return self.json_output or self.markdown
+
+    def analyze_options(self) -> AnalyzeOptions:
+        """Opciones del análisis derivadas de los flags."""
+        return AnalyzeOptions(
+            max_pages=self.max_pages,
+            brief=self.brief,
+            crawl=not self.no_crawl,
+            rdap=self.rdap,
+            timeout=self.timeout,
+        )
 
 
 # --- Idioma -------------------------------------------------------------------------
@@ -103,7 +123,7 @@ def help_language(argv: Sequence[str]) -> str:
 
 
 def make_console(no_color: bool, stderr: bool = False) -> Console:
-    """Consola ``rich`` con ancho máximo de 80 columnas y colores opcionales."""
+    """Consola ``rich`` con ancho máximo de ``MAX_WIDTH`` columnas y colores opcionales."""
     plain = no_color or bool(os.environ.get("NO_COLOR"))
     console = Console(stderr=stderr, color_system=None if plain else "auto", highlight=False)
     console.width = min(console.width, MAX_WIDTH)
@@ -136,12 +156,16 @@ def run(options: RunOptions) -> int:
         lang = cli_lang or load_language() or system_language()
         return _fail(err, t("error.missing_url", lang), lang, EXIT_USAGE)
     else:
-        lang = resolve_language(cli_lang, is_interactive() and not options.json_output)
+        lang = resolve_language(cli_lang, is_interactive() and not options.machine_output)
 
     if options.url is None:
         return _fail(err, t("error.missing_url", lang), lang, EXIT_USAGE)
     if options.max_pages < 1:
         return _fail(err, t("error.invalid_max_pages", lang), lang, EXIT_USAGE)
+    if options.timeout <= 0:
+        return _fail(err, t("error.invalid_timeout", lang), lang, EXIT_USAGE)
+    if options.json_output and options.markdown:
+        return _fail(err, t("error.json_and_md", lang), lang, EXIT_USAGE)
     return _analyze_and_print(options, lang, err)
 
 
@@ -152,12 +176,15 @@ def _analyze_and_print(options: RunOptions, lang: str, err: Console) -> int:
         if options.verbose:
             err.print(f"[dim]· {escape(format_event(code, lang, **params))}[/]")
 
+    settings = options.analyze_options()
     try:
         if options.verbose or not err.is_terminal:
-            result = analyze(options.url, options.max_pages, on_event=on_event)
+            result = analyze(options.url, options.max_pages, options=settings, on_event=on_event)
         else:
             with err.status(t("status.analyzing", lang, url=options.url)):
-                result = analyze(options.url, options.max_pages, on_event=on_event)
+                result = analyze(
+                    options.url, options.max_pages, options=settings, on_event=on_event
+                )
     except FetchError as error:
         return _fail(err, format_error(error, lang), lang, EXIT_NETWORK)
     except KeyboardInterrupt:
@@ -167,6 +194,8 @@ def _analyze_and_print(options: RunOptions, lang: str, err: Console) -> int:
 
     if options.json_output:
         typer.echo(to_json(result, lang))
+    elif options.markdown:
+        typer.echo(to_markdown(result, lang, verbose=options.verbose), nl=False)
     else:
         render(result, lang, make_console(options.no_color), verbose=options.verbose)
     return EXIT_OK
@@ -195,7 +224,9 @@ def build_app(lang: str) -> typer.Typer:
     args_panel = t("help.panel_args", lang)
     opts_panel = t("help.panel_options", lang)
 
-    @app.command(help=t("help.description", lang), add_help_option=False)
+    @app.command(
+        help=t("help.description", lang), epilog=t("help.epilog", lang), add_help_option=False
+    )
     def main_command(
         url: Annotated[
             str | None,
@@ -213,6 +244,23 @@ def build_app(lang: str) -> typer.Typer:
         json_output: Annotated[
             bool, typer.Option("--json", help=t("help.json", lang), rich_help_panel=opts_panel)
         ] = False,
+        markdown: Annotated[
+            bool, typer.Option("--md", help=t("help.md", lang), rich_help_panel=opts_panel)
+        ] = False,
+        brief: Annotated[
+            bool, typer.Option("--brief", help=t("help.brief", lang), rich_help_panel=opts_panel)
+        ] = False,
+        no_crawl: Annotated[
+            bool,
+            typer.Option("--no-crawl", help=t("help.no_crawl", lang), rich_help_panel=opts_panel),
+        ] = False,
+        rdap: Annotated[
+            bool, typer.Option("--rdap", help=t("help.rdap", lang), rich_help_panel=opts_panel)
+        ] = False,
+        timeout: Annotated[
+            float,
+            typer.Option("--timeout", help=t("help.timeout", lang), rich_help_panel=opts_panel),
+        ] = DEFAULT_TIMEOUT,
         lang_option: Annotated[
             str | None,
             typer.Option(
@@ -270,6 +318,11 @@ def build_app(lang: str) -> typer.Typer:
             verbose=verbose,
             no_color=no_color,
             change_lang=change_lang,
+            brief=brief,
+            markdown=markdown,
+            no_crawl=no_crawl,
+            rdap=rdap,
+            timeout=timeout,
         )
         raise typer.Exit(run(options))
 
