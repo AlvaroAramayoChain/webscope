@@ -50,7 +50,7 @@ y las mismas claves de JSON de nivel superior.
 - Aviso de alcance ético en `--help` y aviso de "reconocimiento pasivo" al final del reporte.
 - `CHANGELOG.md` y `docs/FINDINGS.md`.
 - Tests sin red real para cada analizador nuevo, el catálogo, la categoría, el JSON, el
-  Markdown y las fallas parciales (346 tests).
+  Markdown y las fallas parciales (359 tests).
 
 ### Cambiado
 
@@ -62,6 +62,12 @@ y las mismas claves de JSON de nivel superior.
 - `GitHub Pages` solo se detecta con `Server: GitHub.com` exacto (github.com responde en
   minúsculas y antes daba un falso positivo).
 - La verificación TLS usa el almacén del sistema más el bundle de `certifi`.
+- `site_type`: una página con poco texto y sin señales fuertes de app (contenedor SPA,
+  bundles, manifest, service worker, rutas de app, aviso de `<noscript>` o formulario de
+  contraseña) se clasifica como "sitio web" con confianza baja, nunca como "app web".
+- Con categoría indeterminada, el resumen mantiene el formato
+  `Indeterminada — <descripción>` (`Undetermined — …` en inglés).
+- El README principal pasa a estar en inglés; la versión en español está en `README.es.md`.
 
 ### Dependencias
 
