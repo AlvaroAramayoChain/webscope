@@ -18,7 +18,7 @@ def isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Nunca tocar el home real: config en ``tmp_path`` y entorno predecible."""
     config_dir = tmp_path / "config"
     monkeypatch.setenv("WEBSCOPE_CONFIG_DIR", str(config_dir))
-    for name in ("LC_ALL", "LC_MESSAGES", "LANGUAGE", "NO_COLOR"):
+    for name in ("LC_ALL", "LC_MESSAGES", "LANGUAGE", "NO_COLOR", "FORCE_COLOR", "PY_COLORS"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("LANG", "en_US.UTF-8")
     return config_dir

@@ -1,4 +1,5 @@
 import json
+import re
 import socket
 import subprocess
 import sys
@@ -15,6 +16,7 @@ URL = "zapasrun.example"
 SPANISH_LABEL = "De qué trata"
 ENGLISH_LABEL = "About"
 MENU = "Select language / Elegí idioma"
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def invoke(args: list[str], input: str | None = None, help_lang: str = "en"):
@@ -313,8 +315,10 @@ def test_unexpected_errors_are_friendly(monkeypatch: pytest.MonkeyPatch) -> None
 def test_help_is_translated(lang: str, expected: str) -> None:
     result = invoke(["--help"], help_lang=lang)
     assert result.exit_code == 0
-    assert expected in result.stdout
-    assert "--change-lang" in result.stdout
+    # typer fuerza colores si detecta CI (GITHUB_ACTIONS, FORCE_COLOR...): se quitan.
+    text = ANSI_ESCAPE.sub("", result.stdout)
+    assert expected in text
+    assert "--change-lang" in text
 
 
 def test_help_language_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
