@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sunrise Bakery</title>
+  <link rel="stylesheet" href="/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg">
+    <a href="/">Home</a>
+    <a href="/menu.html">Our bread</a>
+    <a href="/about.html">About us</a>
+    <a href="/services.html">Catering</a>
+    <a href="/contact.html">Contact</a>
+    <a href="/files/menu.pdf">Download menu</a>
+    <a href="https://maps.example.com/sunrise">Map</a>
+  </nav>
+  <div class="container">
+    <h1>Fresh sourdough bread baked every morning</h1>
+    <p>Sunrise Bakery is a small family bakery in the old town that bakes sourdough bread, croissants and seasonal pastries every morning before dawn.</p>
+    <p>Our sourdough bread is fermented for thirty six hours with organic flour from local mills, which gives every loaf a deep flavor and a crunchy crust.</p>
+    <p>Besides bread, the bakery prepares cakes for birthdays and weddings, and a catering service with pastries and sandwiches for offices and events.</p>
+    <p>You can visit the bakery from Tuesday to Sunday, order bread online for pickup, or join one of the weekend sourdough baking workshops for beginners.</p>
+    <p>Every evening the bread that was not sold is donated to the community kitchen of the neighborhood, so nothing baked in our ovens goes to waste.</p>
+    <form method="post" action="/contact/">
+      <input type="hidden" name="csrfmiddlewaretoken" value="abc123">
+      <input type="email" name="email" placeholder="Your email">
+      <button type="submit">Subscribe to our newsletter</button>
+    </form>
+  </div>
+  <footer>
+    <p>Sunrise Bakery · 12 Old Town Street · Open Tuesday to Sunday</p>
+  </footer>
+</body>
+</html>
