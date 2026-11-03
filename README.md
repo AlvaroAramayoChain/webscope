@@ -168,15 +168,17 @@ Muestra el progreso del rastreo (por stderr) y una sección con los detalles y l
 URL final         https://www.python.org/
 Estado HTTP       200
 Servidor          nginx
-Respuesta         337 ms
+Respuesta         469 ms
 Idioma de la web  en
 Idioma interfaz   es
-Puntaje           app 1 · sitio 9
+Puntaje           app 1 · sitio 10
 Señales           +1 app: Muchos bundles de JavaScript
                   +3 sitio: Mucho texto estático
                   +2 sitio: Varios párrafos de contenido
                   +2 sitio: Navegación clásica con muchos links
-                  +2 sitio: Páginas informativas (nosotros, contacto, servicios...)
+                  +1 sitio: Muchos títulos y secciones
+                  +2 sitio: Páginas informativas (nosotros, contacto,
+                  servicios...)
 ```
 
 ### JSON
