@@ -46,6 +46,7 @@ STOPWORDS_EN: Final = frozenset(
     want way ways year years home menu search close open skip content main page pages
     privacy policy cookie cookies terms conditions rights reserved copyright accept
     settings login sign log click view all toggle navigation subscribe follow share
+    com org net www http https html
     """.split()
 )
 

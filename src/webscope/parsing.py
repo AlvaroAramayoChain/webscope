@@ -8,7 +8,9 @@ from bs4 import BeautifulSoup
 
 PARSER = "lxml" if importlib.util.find_spec("lxml") else "html.parser"
 NON_CONTENT_TAGS = ("script", "style", "noscript", "template", "svg", "iframe")
-LAYOUT_TAGS = ("nav", "footer", "header", "aside", "form")
+LAYOUT_TAGS = ("nav", "footer", "header", "aside")
+# <header>/<footer> dentro de un artículo son parte del contenido (título, autor...).
+_CONTENT_CONTAINERS = ("main", "article")
 
 
 def make_soup(html: str) -> BeautifulSoup:
@@ -20,6 +22,11 @@ def content_soup(html: str) -> BeautifulSoup:
     """Soup sin scripts, estilos ni bloques de navegación/pie: solo el contenido."""
     soup = make_soup(html)
     for tag in soup.find_all([*NON_CONTENT_TAGS, *LAYOUT_TAGS]):
+        if getattr(tag, "decomposed", False):
+            continue
+        inside_content = tag.find_parent(_CONTENT_CONTAINERS) is not None
+        if tag.name in ("header", "footer") and inside_content:
+            continue
         tag.decompose()
     return soup
 

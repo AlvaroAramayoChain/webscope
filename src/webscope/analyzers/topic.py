@@ -95,9 +95,12 @@ def summarize(html: str, max_chars: int = MAX_CHARS) -> str:
     description = meta_description(soup)
     if len(description) >= _MIN_GOOD_DESCRIPTION:
         return clip(description, max_chars)
-    title = headline(soup)
     if description:
-        if title and title.lower() not in description.lower():
-            return clip(f"{title}: {description}", max_chars)
-        return clip(description, max_chars)
-    return extractive_summary(html, max_chars) or clip(title, max_chars)
+        title_tag = soup.find("title")
+        title = " ".join(title_tag.get_text(" ", strip=True).split()) if title_tag else ""
+        if not title or title.lower() in description.lower():
+            return clip(description, max_chars)
+        if description.lower() in title.lower():
+            return clip(title, max_chars)
+        return clip(f"{title}: {description}", max_chars)
+    return extractive_summary(html, max_chars) or clip(headline(soup), max_chars)
