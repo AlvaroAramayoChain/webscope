@@ -5,17 +5,18 @@ build-backend = "hatchling.build"
 [project]
 name = "webscope"
 dynamic = ["version"]
-description = "CLI que analiza una URL y resume de qué trata, cuántas páginas tiene, qué tecnologías usa, sus palabras clave y si es un sitio o una app web."
+description = "CLI de reconocimiento pasivo: de qué trata una web, su infraestructura (IPs, red, DNS, CDN/WAF), TLS y postura de seguridad visible con hallazgos priorizados."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Alvaro Aramayo Chain" }]
-keywords = ["cli", "web", "analyzer", "crawler", "technology-detection", "seo"]
+keywords = ["cli", "web", "recon", "osint", "security-headers", "tls", "dns", "technology-detection"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
     "Natural Language :: English",
     "Natural Language :: Spanish",
     "Operating System :: OS Independent",
@@ -23,6 +24,9 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Internet :: Name Service (DNS)",
     "Topic :: Internet :: WWW/HTTP :: Site Management",
     "Topic :: Utilities",
 ]
@@ -31,6 +35,8 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "rich>=13.0",
     "typer>=0.12",
+    "dnspython>=2.4",
+    "certifi>=2023.7.22",
 ]
 
 [project.optional-dependencies]
@@ -48,6 +54,7 @@ webscope = "webscope.cli:main"
 [project.urls]
 Homepage = "https://github.com/AlvaroAramayoChain/webscope"
 Issues = "https://github.com/AlvaroAramayoChain/webscope/issues"
+Changelog = "https://github.com/AlvaroAramayoChain/webscope/blob/main/CHANGELOG.md"
 
 [tool.hatch.version]
 path = "src/webscope/__init__.py"
@@ -67,8 +74,13 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 # SIM905: las listas de stopwords se leen mejor como texto con .split().
-ignore = ["RUF001", "SIM905"]
+ignore = ["RUF001", "RUF002", "SIM905"]
 
 [tool.ruff.lint.per-file-ignores]
 # Las firmas son una tabla declarativa: una tecnología por línea.
 "src/webscope/analyzers/tech.py" = ["E501"]
+"src/webscope/analyzers/infra.py" = ["E501"]
+"src/webscope/analyzers/category.py" = ["E501"]
+"src/webscope/analyzers/topic.py" = ["E501"]
+# Textos de la interfaz: una cadena por línea se lee mejor que partida.
+"src/webscope/i18n.py" = ["E501"]
