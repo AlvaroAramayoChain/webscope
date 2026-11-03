@@ -1,45 +1,131 @@
 # 🔎 webscope
 
 [![CI](https://github.com/AlvaroAramayoChain/webscope/actions/workflows/ci.yml/badge.svg)](https://github.com/AlvaroAramayoChain/webscope/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-2.0.0-informational)](CHANGELOG.md)
 
-**webscope** is a command-line tool that takes a URL and, in seconds, gives you a clear summary of the website: what it is about, how many pages it has, which technologies it uses, its keywords, and whether it is a website or a web app.
-The interface is bilingual (Spanish / English), and there is a JSON output for integrating it with other tools.
+**webscope** es una herramienta de **reconocimiento pasivo** para la línea de comandos. Le
+das una URL y en unos segundos te devuelve un primer plano del objetivo, pensado para
+analistas de ciberseguridad, auditores y desarrolladores:
 
-<!-- Demo: record with asciinema/vhs and uncomment
-![webscope in action](docs/demo.gif)
--->
+- **De qué trata** el sitio, en concreto: categoría (e-commerce, SaaS, blog…), descripción,
+  nombre, idioma, país y tecnologías con versión.
+- **Infraestructura**: IPs, reverse DNS, red (ASN), CDN/WAF/hosting, nameservers, correo y
+  redirecciones.
+- **TLS**: emisor, dominios cubiertos, días para vencer, protocolo y validez de la cadena.
+- **Seguridad visible**: security headers con nota A–F, cookies, SPF/DMARC/DKIM,
+  `security.txt`, contenido de terceros, formularios y superficie expuesta.
+- **Hallazgos priorizados** por severidad, con evidencia y una recomendación corta.
+
+Todo **sin enviar un solo payload**: solo lee lo que el sitio ya publica. La interfaz es
+bilingüe (español / inglés) y la salida puede ser texto, **JSON** estable o **Markdown**
+para pegar en un informe.
 
 ```
-$ webscope excalidraw.com
-🔎 excalidraw.com
-──────────────────────────────────────────────────────────────────────────────
-About         Excalidraw is a virtual collaborative whiteboard tool that lets
-              you easily sketch diagrams that have a hand-drawn feel to them.
-Type          Web app (confidence: high)
-Pages         ~1 (via sitemap.xml)
-Technologies  HTML, CSS, JavaScript · Vercel
-Keywords      excalidraw, whiteboard, collaborative, virtual, tool, sketch,
-              diagrams, hand
+$ webscope alvaroaramayochain.github.io
+🔎 alvaroaramayochain.github.io  ·  https://alvaroaramayochain.github.io/
+═══════════════════════════════════════════════════════════════════════════════
+ GENERAL
+ De qué trata    Portfolio personal — Full stack developer based in Argentina.
+                 Websites and web applications with WhatsApp and email
+                 integrations, built end to end.
+ Tipo            Sitio web (confianza: alta)
+ Sitio           Alvaro Aramayo Chain · idioma en
+ Páginas         1 (vía rastreo de links)
+ Tecnologías     HTML, CSS, JavaScript · GitHub Pages · Fastly
+ Palabras clave  end, work, website, alvaro, aramayo, chain, full, stack
+
+ INFRAESTRUCTURA
+ IPs             185.199.111.153 (IPv4) · 185.199.109.153 (IPv4) ·
+                 2606:50c0:8003::153 (IPv6) · 2606:50c0:8001::153 (IPv6) (+4)
+ Reverse DNS     cdn-185-199-111-153.github.com, cdn-185-199-109-153.github.com
+ Red             AS54113 Fastly, Inc. · US
+ CDN / WAF       Fastly, GitHub Pages
+ Nameservers     dns1.p05.nsone.net, dns2.p05.nsone.net, dns3.p05.nsone.net,
+                 dns4.p05.nsone.net
+ Correo (MX)     sin MX
+
+ TLS
+ Certificado     Let's Encrypt (YR1) · vence en 56 días · TLS 1.3
+ Dominios (SAN)  *.github.com, *.github.io, *.githubusercontent.com, github.com
+                 (+2)
+
+ SEGURIDAD VISIBLE
+ Headers         Nota D (2/8) · faltan: CSP, X-Frame-Options,
+                 X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+ Cookies         sin cookies
+ Email           SPF: no · DMARC: no
+ Otros           security.txt: no · HTTP→HTTPS: sí (301) · formularios: 0
+
+ HALLAZGOS
+ [MEDIO] Falta Content-Security-Policy
+ [MEDIO] No se observó un registro DMARC
+ [BAJO]  Sin protección contra framing (X-Frame-Options / frame-ancestors)
+ [BAJO]  Falta X-Content-Type-Options: nosniff
+ [BAJO]  No se observó un registro SPF
+ [INFO]  Falta Referrer-Policy
+ [INFO]  Falta Permissions-Policy
+ [INFO]  No se observó /.well-known/security.txt
+
+Reconocimiento pasivo. Las observaciones no confirman vulnerabilidades.
 ```
 
-## Contents
+## Contenido
 
-- [Installation](#installation)
-- [Usage](#usage)
-- [Interface language](#interface-language)
-- [Output examples](#output-examples)
-- [How it works](#how-it-works)
-- [Limitations](#limitations)
-- [Project structure](#project-structure)
-- [Tests and quality](#tests-and-quality)
+- [Alcance y ética](#alcance-y-ética)
+- [Instalación](#instalación)
+- [Uso](#uso)
+- [Qué muestra cada bloque](#qué-muestra-cada-bloque)
+- [Ejemplos de salida](#ejemplos-de-salida)
+- [Catálogo de hallazgos](#catálogo-de-hallazgos)
+- [Idioma de la interfaz](#idioma-de-la-interfaz)
+- [Cómo funciona](#cómo-funciona)
+- [Servicios de terceros](#servicios-de-terceros)
+- [Limitaciones](#limitaciones)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Tests y calidad](#tests-y-calidad)
 - [Roadmap](#roadmap)
-- [License](#license)
+- [Licencia](#licencia)
 
-## Installation
+## Alcance y ética
 
-Requires **Python 3.10 or newer**.
+> ⚠️ **Usá webscope solo sobre sitios propios, con autorización del dueño o dentro del
+> alcance de un programa de bug bounty.** El mismo aviso aparece en `webscope --help`.
+
+webscope está diseñado para ser **pasivo** a propósito. Eso se garantiza en el código, no
+solo en esta documentación.
+
+**Lo único que hace contra el objetivo:**
+
+| Acción | Para qué |
+|---|---|
+| `GET` a la home (siguiendo redirecciones) | Contenido, headers, cookies, cadena de redirecciones |
+| `GET /robots.txt` y sitemaps declarados | Contar páginas y respetar `Disallow` |
+| `GET /.well-known/security.txt` | Ver si hay un canal para reportes |
+| Un `GET http://` | Ver si redirige a HTTPS y con qué código |
+| Crawl liviano de links internos (si no hay sitemap) | Contar páginas, hasta `--max-pages` |
+| Hasta 5 `GET` a páginas internas (nosotros, productos, contacto, blog, docs) | Entender mejor de qué trata |
+| Una conexión TLS estándar | Leer el certificado y lo negociado |
+| Consultas DNS | Registros públicos, PTR y ASN |
+
+**Lo que no hace nunca** (no existe código para eso): escaneo de puertos, fuerza bruta o
+"descubrimiento" de rutas, fuzzing, intentos de login, envío de payloads, pruebas activas
+de ciphers o protocolos débiles, ni explotación de ningún tipo. Los endpoints como `/admin`
+o `/api` se listan **solo si aparecen referenciados en el HTML o JS**, y no se sondean.
+
+**Buenas prácticas incluidas:**
+
+- User-Agent identificable: `webscope/2.0.0 (+https://github.com/AlvaroAramayoChain/webscope)`.
+- Respeta `robots.txt` para el crawl y para las páginas internas.
+- Pausa de 0,3 s entre requests del crawl y timeouts cortos en todo.
+- Los hallazgos son **observaciones**, no un veredicto. El lenguaje es prudente ("posible",
+  "no se observó") y webscope nunca afirma que algo "es vulnerable". Cada observación es un
+  punto de partida para que un humano la verifique.
+
+## Instalación
+
+Requiere **Python 3.10 o superior**.
 
 ```bash
 git clone https://github.com/AlvaroAramayoChain/webscope.git
@@ -47,49 +133,266 @@ cd webscope
 pip install .
 ```
 
-Optional: `pip install ".[fast]"` also installs `lxml`, a faster HTML parser. Without it, webscope falls back to the standard library's `html.parser`.
+Opcional: `pip install ".[fast]"` instala además `lxml`, un parser HTML más rápido. Sin él
+se usa `html.parser` de la biblioteca estándar.
 
-### Development mode
+### Modo desarrollo
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"          # includes pytest, responses, ruff and lxml
+pip install -e ".[dev]"          # incluye pytest, responses, ruff y lxml
 ```
 
-## Usage
+## Uso
 
 ```bash
-webscope https://example.com                 # regular analysis
-webscope example.com                         # no scheme: https:// is assumed
-webscope https://example.com --max-pages 100 # crawl limit when there is no sitemap (default 50)
-webscope https://example.com --json          # JSON only, on stdout
-webscope https://example.com --lang es       # Spanish interface for this run only
-webscope https://example.com --verbose       # signals, HTTP details and crawl progress
-webscope https://example.com --no-color      # no colors (NO_COLOR is honored too)
-webscope --change-lang                       # pick the interface language again
-python -m webscope https://example.com       # same thing, without the entry point
+webscope https://ejemplo.com                 # reporte completo (5 bloques)
+webscope ejemplo.com                         # sin esquema se asume https://
+webscope ejemplo.com --brief                 # solo el bloque GENERAL (rápido, sin DNS ni TLS)
+webscope ejemplo.com --verbose               # señales, evidencias, recomendaciones y detalle
+webscope ejemplo.com --json                  # JSON completo y estable, solo en stdout
+webscope ejemplo.com --md                    # reporte en Markdown para notas o informes
+webscope ejemplo.com --no-crawl              # no cuenta páginas
+webscope ejemplo.com --rdap                  # suma datos de registro del dominio (opt-in)
+webscope ejemplo.com --timeout 5             # timeout por request, conexión TLS y consulta DNS
+webscope ejemplo.com --max-pages 100         # límite del crawl cuando no hay sitemap (50 por defecto)
+webscope ejemplo.com --lang en               # interfaz en inglés solo para esta ejecución
+webscope ejemplo.com --no-color              # sin colores (también respeta NO_COLOR)
+webscope --change-lang                       # volver a elegir el idioma de la interfaz
+python -m webscope ejemplo.com               # lo mismo sin el entry point
 ```
 
-| Exit code | Meaning |
+| Exit code | Significado |
 |---|---|
-| `0` | Success |
-| `1` | Network or URL error (DNS, timeout, SSL, 4xx/5xx, non-HTML content) |
-| `2` | Usage error (missing URL, invalid `--lang`, `--max-pages` < 1...) |
+| `0` | Éxito (aunque algún bloque haya quedado "no disponible") |
+| `1` | Error de red o de URL al descargar la home (DNS, timeout, SSL, 4xx/5xx, no es HTML) |
+| `2` | Error de uso (falta la URL, `--lang` inválido, `--max-pages` < 1, `--timeout` ≤ 0, `--json` con `--md`) |
 
-Errors are always shown as a short, translated message, never as a stack trace:
+Los errores siempre se muestran como un mensaje corto y traducido, nunca como un stack trace.
+
+## Qué muestra cada bloque
+
+### GENERAL: de qué trata
+
+| Dato | Cómo se obtiene |
+|---|---|
+| **De qué trata** | `<Categoría> — <descripción>`. La descripción sale de la mejor fuente disponible: JSON-LD/schema.org, `meta description`, Open Graph o Twitter. Se limpia el boilerplate ("Bienvenido a…", "Home \|", el nombre del sitio repetido). Si no hay metadatos útiles, se arma un resumen extractivo con las frases más informativas de la home y de hasta 5 páginas internas, descartando banners de cookies, menús y pies. |
+| **Categoría** | Diccionarios es/en de señales ponderadas: tipos de schema.org (`Product`, `BlogPosting`, `SoftwareApplication`, `Restaurant`…), `og:type`, TLD (`.gob`, `.edu`…), tecnologías (WooCommerce, Shopify…), rutas de los links (`/carrito`, `/pricing`, `/docs`…) y palabras clave. Si la confianza no alcanza, queda **indeterminada** en vez de inventar. |
+| **Tipo** | Sitio web o app web, con nivel de confianza (heurísticas de la v0.1). |
+| **Sitio** | Nombre (`og:site_name`, JSON-LD o título), idioma detectado y país como pista (ccTLD, dirección en schema.org o `lang` regional). |
+| **Páginas** | Por `sitemap.xml` (vía `robots.txt`) o, si no hay, rastreando links internos. |
+| **Tecnologías** | Firmas declarativas sobre HTML y headers, **con versión** cuando es visible (`WordPress 6.4.3`, `jQuery 3.7.1`, `nginx/1.25.3`…), agrupadas en lenguaje, CMS, e-commerce, frontend, librerías, backend, analítica, servicios, servidor y CDN. |
+| **Palabras clave** | Frecuencia ponderada (título, encabezados y metas pesan más). |
+
+### INFRAESTRUCTURA
+
+IPs A/AAAA (y la IP efectivamente usada si difiere), reverse DNS (PTR), red (ASN,
+organización y país vía Team Cymru), CDN/WAF/hosting inferido por headers (`cf-ray`,
+`x-sucuri-id`, `x-akamai-*`, `x-amz-cf-id`, `x-served-by`, `via`…), CNAMEs (cloudfront,
+azureedge, fastly, vercel, netlify, github.io…), organización del ASN y PTR. También
+nameservers, MX (detecta MX nulo), y con `--verbose` TXT, CAA, CNAME de raíz y `www`, la
+cadena completa de redirecciones y la evidencia de cada CDN. Con `--rdap` suma registrador,
+fecha de creación, vencimiento y edad del dominio.
+
+Si el objetivo es una IP se omiten las consultas que no aplican. Si es `localhost` o una IP
+privada, el bloque DNS se marca "no disponible (host local o IP privada)", sin errores.
+
+### TLS
+
+Un único handshake estándar: emisor, SANs, fechas de validez, **días para vencer**, versión
+de protocolo y cipher negociados, y si la cadena valida. Si la verificación falla, se
+reporta como hallazgo (`TLS-CERT-INVALID` o `TLS-EXPIRED`) y el programa sigue. Para eso
+se repite el handshake sin verificar, solo para leer el certificado.
+
+### SEGURIDAD VISIBLE
+
+| Fila | Qué evalúa |
+|---|---|
+| **Headers** | HSTS (`max-age`, `includeSubDomains`, `preload`), CSP (`unsafe-inline`, `unsafe-eval`, comodines), X-Frame-Options o `frame-ancestors`, X-Content-Type-Options, Referrer-Policy y Permissions-Policy. Puntaje sobre 8 y **nota A–F** ([criterio](docs/FINDINGS.md#criterio-del-puntaje-de-headers)). COOP/CORP/COEP se informan con `--verbose`. |
+| **Cookies** | Cantidad y, por cookie, `Secure`, `HttpOnly`, `SameSite` y prefijos `__Host-`/`__Secure-`. |
+| **Email** | SPF (y su política `-all`/`~all`/`?all`/`+all`), DMARC (`p=none/quarantine/reject`), DKIM en selectores comunes (solo DNS), MTA-STS y BIMI. Si una consulta DNS falla se muestra `?`, nunca "no". |
+| **Otros** | `security.txt` (contacto y vencimiento), redirección HTTP→HTTPS y su código, formularios y formularios de login. |
+| **Terceros** | Dominios externos de los que se cargan scripts, estilos, imágenes o iframes. |
+| **Superficie** | Subdominios vistos en los SANs y en el HTML/JS, y endpoints como `/api`, `/graphql`, `/admin`, `/login`, `/wp-admin` o `/wp-json` **referenciados en el contenido**. |
+
+Con `--verbose` se suman los valores de cada header, las fugas de versión (`Server`,
+`X-Powered-By`, `X-AspNet-Version`, `X-Generator`, meta generator, comentarios HTML), el
+detalle de cookies, las rutas sensibles de `robots.txt`, el contenido mixto y los recursos
+sin SRI.
+
+### HALLAZGOS
+
+Lista ordenada por severidad (`CRÍTICO`, `ALTO`, `MEDIO`, `BAJO`, `INFO`), con colores
+sobrios. Con `--verbose` cada hallazgo muestra su evidencia, una recomendación corta y su
+id estable.
+
+## Ejemplos de salida
+
+### En inglés (`--lang en`)
 
 ```
-$ webscope no-such-domain-zzz.invalid --lang en
-Error: Could not resolve the domain no-such-domain-zzz.invalid. Is it spelled
-correctly?
+$ webscope github.com --lang en
+🔎 github.com  ·  https://github.com/
+═══════════════════════════════════════════════════════════════════════════════
+ GENERAL
+ About          SaaS / software — Join the world's most widely adopted,
+                AI-powered developer platform where millions of developers,
+                businesses, and the largest open source community build
+                software that…
+ Type           Website (confidence: high)
+ Site           GitHub · language en
+ Pages          ~375 (via sitemap.xml)
+ Technologies   HTML, CSS, JavaScript
+ Keywords       github, developer, code, nov, stars, week, mercado, libre
+
+ INFRASTRUCTURE
+ IPs            4.228.31.150 (IPv4)
+ Network        AS8075 Microsoft Corporation · US
+ CDN / WAF      Microsoft Azure
+ Nameservers    dns1.p08.nsone.net, dns2.p08.nsone.net, dns3.p08.nsone.net,
+                dns4.p08.nsone.net
+ Mail (MX)      github-com.mail.protection.outlook.com
+
+ TLS
+ Certificate    Sectigo Limited (Sectigo Public Server Authentication CA DV
+                E36) · expires in 85 days · TLS 1.3
+ Domains (SAN)  github.com, www.github.com
+
+ VISIBLE SECURITY
+ Headers        Grade A (7/8) · missing: Permissions-Policy
+ Cookies        3 cookies · 1 without HttpOnly
+ Email          SPF: ? · DMARC: p=quarantine · DKIM: google, selector1, k1, k2
+ Other          security.txt: yes · HTTP→HTTPS: ? · forms: 2
+ Third parties  3 domains: github.githubassets.com, images.ctfassets.net,
+                videos.ctfassets.net
+ Surface        subdomains: 9 · endpoints: /cmc_internal/api, /login
+
+ FINDINGS
+ [LOW]  1 cookie(s) without HttpOnly
+ [INFO] Missing Permissions-Policy
+ [INFO] robots.txt mentions 4 path(s) that sound sensitive
+ [INFO] 28 external resource(s) without SRI (github.githubassets.com)
+ [INFO] 2 sensitive endpoint(s) referenced in the content
+
+Passive reconnaissance. Observations do not confirm vulnerabilities.
 ```
 
-## Interface language
+> `SPF: ?` y `HTTP→HTTPS: ?` significan que esa consulta no tuvo respuesta desde la red
+> donde se corrió el ejemplo (el resolver local no devolvió el TXT grande y el puerto 80
+> no respondió). webscope no lo convierte en un hallazgo falso.
 
-### First run
+### JSON (`--json`)
 
-The first time you run webscope in a terminal (without `--lang` and with no saved preference), this menu appears before the analysis starts:
+Las **claves siempre están en inglés** y el esquema es estable (`schema_version: "2.0"`).
+Por stdout sale solo JSON válido; los textos de los hallazgos (`title`, `recommendation`)
+van en el idioma de la interfaz. Extracto de `webscope example.com --json`:
+
+```json
+{
+  "schema_version": "2.0",
+  "webscope_version": "2.0.0",
+  "scanned_at": "2026-11-03T05:14:54Z",
+  "url": "https://example.com",
+  "final_url": "https://example.com/",
+  "domain": "example.com",
+  "ui_lang": "es",
+  "site_lang": "en",
+  "general": {
+    "summary": "This domain is for use in documentation examples without needing permission. …",
+    "category": { "code": "unknown", "confidence": "low", "score": 4, "signals": [{ "category": "docs", "reason": "kw:documentation", "weight": 4 }] },
+    "site_name": "Example Domain",
+    "technologies": [{ "name": "Cloudflare", "category": "cdn", "version": null }],
+    "pages": { "count": 1, "source": "crawl", "at_least": false }
+  },
+  "infrastructure": {
+    "ipv4": ["104.20.23.154", "172.66.147.243"],
+    "asn": { "104.20.23.154": { "asn": 13335, "org": "Cloudflare, Inc.", "country": "US", "prefix": "104.20.16.0/20", "registry": "arin" } },
+    "cdn": [{ "name": "Cloudflare", "kind": "cdn+waf", "evidence": "header cf-ray" }],
+    "dns": { "ns": ["elliott.ns.cloudflare.com", "hera.ns.cloudflare.com"], "mx": ["0 ."], "dmarc": ["v=DMARC1;p=reject;sp=reject;adkim=s;aspf=s"] },
+    "redirects": []
+  },
+  "tls": { "issuer": "SSL Corporation (Cloudflare TLS Issuing ECC CA 3)", "days_left": 52, "protocol": "TLSv1.3", "verified": true },
+  "security": { "https": true, "headers": { "score": 0, "max_score": 8, "grade": "F" } },
+  "findings": [
+    {
+      "id": "HTTP-NO-REDIRECT",
+      "severity": "medium",
+      "title": "http:// no redirige a https://",
+      "evidence": "http:// -> 200 http://example.com/",
+      "recommendation": "Redirigir todo el tráfico HTTP a HTTPS con 301."
+    }
+  ],
+  "unavailable": {}
+}
+```
+
+| Sección | Contenido |
+|---|---|
+| `schema_version`, `webscope_version`, `scanned_at` | Versión del esquema, de la herramienta y fecha UTC (ISO 8601) |
+| `ui_lang`, `site_lang` | Idioma de la interfaz y de la web analizada |
+| `general` | Resumen, descripción y fuente, categoría con señales, nombre, país, tipo, páginas, tecnologías con versión y palabras clave |
+| `infrastructure` | IPs, IP conectada, PTR, ASN, CDN con evidencia, registros DNS, RDAP y redirecciones |
+| `tls` | Sujeto, emisor, SANs, fechas, `days_left`, protocolo, cipher y verificación |
+| `security` | Headers (checks, puntaje, nota), fugas, cookies, email, archivos, redirección HTTP, contenido y superficie |
+| `findings` | Lista ordenada de `{id, severity, title, evidence, recommendation}` |
+| `unavailable` | Bloques que no se pudieron completar y el código del motivo (p. ej. `"dns": "dns_timeout"`) |
+
+Las claves de la v0.1 (`summary`, `site_type`, `pages`, `technologies`, `keywords`, `http`)
+se mantienen en el nivel superior por compatibilidad.
+
+### Markdown (`--md`)
+
+Listo para pegar en un informe, un issue o Obsidian. Extracto de
+`webscope example.com --md --lang es`:
+
+```markdown
+# 🔎 example.com
+
+**URL:** https://example.com/
+**Escaneado:** 2026-11-03T05:14:59Z · webscope 2.0.0
+
+## TLS
+
+| Dato | Valor |
+|---|---|
+| Certificado | SSL Corporation (Cloudflare TLS Issuing ECC CA 3) · vence en 52 días · TLS 1.3 |
+| Dominios (SAN) | example.com, *.example.com |
+
+## HALLAZGOS
+
+| Severidad | ID | Hallazgo | Evidencia | Recomendación |
+|---|---|---|---|---|
+| MEDIO | `HTTP-NO-REDIRECT` | http:// no redirige a https:// | http:// -> 200 http://example.com/ | Redirigir todo el tráfico HTTP a HTTPS con 301. |
+| MEDIO | `HDR-HSTS-MISSING` | Falta Strict-Transport-Security (HSTS) | Strict-Transport-Security: - | Agregar HSTS con max-age de al menos 6 meses (idealmente 1 año). |
+| INFO | `DNS-NO-CAA` | No se observó un registro CAA | CAA: - | Publicar CAA para limitar qué CAs pueden emitir certificados. |
+
+> Reconocimiento pasivo. Las observaciones no confirman vulnerabilidades.
+```
+
+## Catálogo de hallazgos
+
+42 reglas declarativas e internacionalizadas, cada una con un **id estable**. La lista
+completa, con severidad, qué observa y qué se recomienda, está en
+[`docs/FINDINGS.md`](docs/FINDINGS.md). Resumen por familia:
+
+| Familia | Ejemplos de ids | Severidades |
+|---|---|---|
+| TLS y HTTPS | `TLS-EXPIRED`, `TLS-CERT-INVALID`, `TLS-EXPIRING`, `TLS-OLD-PROTOCOL`, `HTTPS-MISSING`, `HTTP-NO-REDIRECT` | alta / media |
+| Security headers | `HDR-HSTS-MISSING`, `HDR-CSP-MISSING`, `HDR-CSP-UNSAFE`, `HDR-XFO-MISSING`, `HDR-XCTO-MISSING`… | media / baja / info |
+| Fugas de información | `LEAK-SERVER-VERSION`, `LEAK-POWERED-BY`, `LEAK-ASPNET-VERSION`, `LEAK-GENERATOR`, `LEAK-HTML-COMMENT` | baja / info |
+| Cookies | `COOKIE-NO-SECURE`, `COOKIE-NO-HTTPONLY`, `COOKIE-NO-SAMESITE` | media / baja |
+| Correo | `SPF-PERMISSIVE`, `SPF-MISSING`, `SPF-NEUTRAL`, `SPF-MULTIPLE`, `DMARC-MISSING`, `DMARC-NONE`, `DKIM-NOT-FOUND` | alta a info |
+| Archivos | `SECTXT-MISSING`, `SECTXT-EXPIRED`, `ROBOTS-SENSITIVE` | baja / info |
+| Contenido y formularios | `FORM-PASSWORD-HTTP`, `FORM-INSECURE-ACTION`, `CONTENT-MIXED`, `CONTENT-NO-SRI`, `FORM-EXTERNAL-ACTION`… | alta a info |
+| Superficie e inventario | `SURFACE-ENDPOINTS`, `TECH-VERSIONS`, `DNS-NO-CAA` | info |
+
+## Idioma de la interfaz
+
+### Primera ejecución
+
+La primera vez que corrés webscope en una terminal (sin `--lang` y sin preferencia
+guardada) aparece este menú:
 
 ```
 Select language / Elegí idioma
@@ -98,213 +401,160 @@ Select language / Elegí idioma
 >
 ```
 
-It accepts `1`, `2`, `es` or `en` (case-insensitive). If the answer is invalid it asks again, and after 3 attempts it falls back to Spanish. The choice is saved and the analysis continues in that language. Later runs use the saved language without asking.
+Acepta `1`, `2`, `es` o `en`. Si la respuesta no es válida vuelve a preguntar, y después de
+3 intentos usa español. La elección se guarda y las siguientes ejecuciones la usan sin
+preguntar.
 
-### `--lang` and `--change-lang`
-
-- `--lang es|en` takes precedence over everything, skips the menu and **does not change** the saved language.
-- `webscope --change-lang` shows the menu again and saves the new choice (works with or without a URL).
-
-### Priority order
+### Prioridad
 
 ```
---lang  >  saved language  >  menu (interactive only)  >  system language
+--lang  >  idioma guardado  >  menú (solo en modo interactivo)  >  idioma del sistema
 ```
 
-In non-interactive mode (redirected stdin, pipes, CI) or with `--json`, the menu is **never** shown: webscope uses `--lang`, then the saved language, then the system one (`LANG`/locale: anything starting with `es` → Spanish, otherwise → English).
+- `--lang es|en` gana siempre, saltea el menú y **no cambia** el idioma guardado.
+- `webscope --change-lang` vuelve a mostrar el menú y guarda la nueva elección.
+- En modo no interactivo (pipes, CI) o con `--json`/`--md` el menú **nunca** aparece.
 
-> The interface language is independent of the language of the analyzed website. You can use the interface in English and analyze a Spanish website: the summary and the keywords stay in the website's original language.
+> El idioma de la interfaz es independiente del idioma del sitio analizado: la descripción
+> y las palabras clave quedan en el idioma original de la web.
 
-### Where the preference is stored
-
-| System | File |
+| Sistema | Dónde se guarda la preferencia |
 |---|---|
-| Linux / macOS | `~/.config/webscope/config.json` (or `$XDG_CONFIG_HOME/webscope/config.json`) |
+| Linux / macOS | `~/.config/webscope/config.json` (o `$XDG_CONFIG_HOME/webscope/config.json`) |
 | Windows | `%APPDATA%\webscope\config.json` |
-| Any | `$WEBSCOPE_CONFIG_DIR/config.json` if that variable is set |
+| Cualquiera | `$WEBSCOPE_CONFIG_DIR/config.json` si esa variable está definida |
 
-If the file is corrupt or the folder is not writable, webscope keeps working normally; it just does not remember the choice.
-
-## Output examples
-
-### In Spanish
+## Cómo funciona
 
 ```
-$ webscope www.argentina.gob.ar --lang es
-🔎 argentina.gob.ar
-──────────────────────────────────────────────────────────────────────────────
-De qué trata    Portal oficial del Estado argentino. Conocé cómo hacer trámites
-                en organismos públicos, tramitalos en línea y recibí servicios
-                digitales y beneficios.
-Tipo            Sitio web (confianza: media)
-Páginas         ~176046 (vía sitemap.xml)
-Tecnologías     HTML, CSS, JavaScript, PHP · Drupal · jQuery, Bootstrap ·
-                Cloudflare
-Palabras clave  servicios, argentina, organismos, argentino, gobierno,
-                trámites, digital, beneficios
+              ┌────────────── red (solo en estos módulos) ──────────────┐
+URL ─► fetcher ──► home ──┬─► crawler   (robots.txt, sitemaps, BFS)      │
+                          ├─► dnsinfo   (dnspython: registros, PTR, ASN) │  en paralelo
+                          ├─► tlsprobe  (ssl/socket: un handshake)       │  (ThreadPoolExecutor)
+                          └─► fetcher   (security.txt, http://, RDAP)    │
+              └─────────────────────────────────────────────────────────┘
+                                   │ datos crudos
+                                   ▼
+        analyzers/ (funciones puras: sin red, sin idioma)
+        topic · category · tech · keywords · site_type · infra · tls · security · findings
+                                   │ códigos estables + datos
+                                   ▼
+        report.py ─► texto (rich) · Markdown · JSON        i18n.py ─► es / en
 ```
 
-### In English
+Decisiones de diseño:
 
-```
-$ webscope python.org --lang en --max-pages 20
-🔎 python.org
-──────────────────────────────────────────────────────────────────────────────
-About         Welcome to Python.org: The official home of the Python
-              Programming Language
-Type          Website (confidence: high)
-Pages         at least 20 (via link crawl)
-Technologies  HTML, CSS, JavaScript · jQuery · nginx
-Keywords      python, software, welcome, programming, download, community,
-              data, language
-```
+- **Red aislada**: solo `fetcher`, `crawler`, `dnsinfo` y `tlsprobe` tocan la red. Los
+  analizadores son funciones puras que reciben headers, HTML o registros ya obtenidos, así
+  que se testean sin mocks complicados.
+- **Cada bloque falla por su cuenta**: si DNS, TLS, el crawl o RDAP fallan, el resto del
+  reporte sale igual y ese bloque muestra `no disponible (motivo)`. Solo si no se puede
+  descargar la home el programa termina con exit code 1.
+- **"Falló" no es "no existe"**: una consulta DNS que no respondió se marca como `?` y no
+  dispara hallazgos como `SPF-MISSING`.
+- **Todo es declarativo**: firmas de tecnologías (`analyzers/tech.py`), reglas de CDN/WAF
+  (`analyzers/infra.py`), diccionarios de categorías (`analyzers/category.py`) y catálogo
+  de hallazgos (`analyzers/findings.py`). Ampliar cualquiera es sumar una entrada.
+- **Los analizadores devuelven códigos**, nunca texto. `report.py` es el único que traduce,
+  por eso texto, Markdown y JSON muestran exactamente la misma información.
+- El análisis completo tarda unos 5–13 s en sitios reales (objetivo: menos de 15 s).
 
-### With `--verbose`
+## Servicios de terceros
 
-Shows the crawl progress (on stderr) and a section with the details and the signals that decided the site type:
+webscope usa solo los servicios estrictamente necesarios, todos sin API keys:
 
-```
-─────────────────────────────────── Details ───────────────────────────────────
-Final URL      https://www.python.org/
-HTTP status    200
-Server         nginx
-Response       352 ms
-Site language  en
-UI language    en
-Score          app 1 · site 10
-Signals        +1 app: Many JavaScript bundles
-               +3 site: Lots of static text
-               +2 site: Several content paragraphs
-               +2 site: Classic navigation with many links
-               +1 site: Many headings and sections
-               +2 site: Informational pages (about, contact, services...)
-```
+| Servicio | Cuándo | Qué se envía |
+|---|---|---|
+| **Resolver DNS del sistema** | Siempre (salvo `--brief`) | Los nombres a consultar del dominio objetivo |
+| **Team Cymru** (`origin.asn.cymru.com`, `origin6.asn.cymru.com`, `asn.cymru.com`) | Siempre (salvo `--brief`) | Las IPs del objetivo, como consulta DNS TXT, para saber su ASN |
+| **rdap.org** | Solo con `--rdap` (opt-in) | El dominio registrable, por HTTPS, para obtener los datos de registro |
 
-### JSON
+`rdap.org` es opt-in justamente porque envía el dominio a un tercero por HTTP. Ningún otro
+dato sale de tu máquina.
 
-**JSON keys are always in English** and never change with the interface language, so integrations do not break. Values that are codes (`site`/`app`, `low`/`medium`/`high`, `sitemap`/`crawl`) are not translated either; free text such as `summary` stays in the website's original language.
+## Limitaciones
 
-```
-$ webscope excalidraw.com --json --lang es
-```
+Lo que un reconocimiento pasivo puede y no puede saber:
 
-```json
-{
-  "url": "https://excalidraw.com",
-  "final_url": "https://excalidraw.com/",
-  "domain": "excalidraw.com",
-  "ui_lang": "es",
-  "site_lang": "en",
-  "summary": "Excalidraw is a virtual collaborative whiteboard tool that lets you easily sketch diagrams that have a hand-drawn feel to them.",
-  "site_type": {
-    "type": "app",
-    "confidence": "high",
-    "scores": { "app": 9, "site": 0 },
-    "signals": [
-      { "code": "spa_root", "target": "app", "weight": 3 },
-      { "code": "little_text", "target": "app", "weight": 2 },
-      { "code": "module_scripts", "target": "app", "weight": 1 }
-    ]
-  },
-  "pages": { "count": 1, "source": "sitemap", "at_least": false },
-  "technologies": [
-    { "name": "HTML", "category": "language" },
-    { "name": "CSS", "category": "language" },
-    { "name": "JavaScript", "category": "language" },
-    { "name": "Vercel", "category": "server" }
-  ],
-  "keywords": ["excalidraw", "whiteboard", "collaborative", "virtual", "tool", "sketch", "diagrams", "hand"],
-  "http": { "status": 200, "server": "Vercel", "elapsed_ms": 232 },
-  "webscope_version": "0.1.0"
-}
-```
+- **El backend solo se detecta si deja pistas** (headers como `X-Powered-By`, cookies como
+  `laravel_session`, tokens como `csrfmiddlewaretoken`). Muchos sitios las ocultan a propósito.
+- **La categoría es heurística**: diccionarios de señales, no un modelo de lenguaje. Con poca
+  evidencia, o con evidencia empatada, queda "indeterminada". Un sitio puede tener rasgos de
+  varias categorías (un SaaS con blog, por ejemplo).
+- **Un WAF/CDN puede ocultar el origen**: las IPs, el ASN y el reverse DNS suelen ser los del
+  CDN (Cloudflare, Fastly, Akamai…), no los del servidor real. webscope no intenta
+  descubrir el origen.
+- **DKIM se busca solo en selectores comunes** (`default`, `google`, `selector1`, `k1`…). Que
+  no se encuentre no significa que el dominio no firme su correo.
+- **El conteo de páginas es aproximado**: con sitemap cuenta las URLs declaradas; sin sitemap,
+  solo las alcanzables por links desde la home, hasta `--max-pages`.
+- **No ejecuta JavaScript**: en una SPA pura el contenido real puede no estar en el HTML.
+- **El dominio registrable es aproximado** (`ejemplo.com.ar`, `ejemplo.co.uk`…): no se usa la
+  Public Suffix List para no sumar dependencias.
+- Los resultados de DNS dependen del resolver: algunos resolvers hogareños no devuelven
+  respuestas TXT grandes. En ese caso se muestra `?`.
+- Los hallazgos son observaciones a verificar, no confirmaciones de vulnerabilidades.
+- Los mensajes propios de `click` (`No such option`, `Usage:`) quedan en inglés.
 
-(Signal list trimmed for the example.)
-
-## How it works
-
-```
-URL ─► fetcher ─► HTML + headers ─┬─► topic      ─► summary
-                                  ├─► tech       ─► technologies
-                                  ├─► keywords   ─► keywords + site language
-                                  ├─► site_type  ─► site / app + confidence + signals
-                  crawler ◄───────┘
-                  (robots.txt, sitemap.xml or BFS crawl) ─► page count
-                                  │
-                                  ▼
-                       report (rich / JSON, translated with i18n)
-```
-
-The **analyzers are pure functions**: they take the HTML (and the headers when needed) and return data and codes, without doing any network calls and without knowing the interface language. All network code lives in `fetcher` and `crawler`, and translation happens only in `report`.
-
-- **fetcher**: downloads the home page with `requests` (10 s timeout, custom `webscope/<version>` user agent, redirects, 5 MB limit) and turns any failure into an error with a stable code (`dns`, `timeout`, `ssl`, `http`, `not_html`...).
-- **crawler**: honors `robots.txt`. It looks for the sitemap declared in `robots.txt` or at `/sitemap.xml`, supports *sitemap indexes* (with a depth limit) and `.xml.gz` sitemaps. Without a sitemap, it follows same-domain internal links breadth-first up to `--max-pages`, pausing 0.3 s between requests and deduplicating URLs (no fragments, no trailing slash). If it stops at the limit, it reports "at least N".
-- **topic**: uses `meta description` / `og:description` and the `<title>`. Without a description, it builds an extractive summary from the most representative sentences of the main text (ignoring `nav`, `footer`, `script` and `style`). About 200 characters max.
-- **tech**: detects technologies through signatures over the HTML and the headers. Signatures are a declarative table in [`tech.py`](src/webscope/analyzers/tech.py): adding a technology means adding one line. It covers HTML/CSS/JS, TypeScript, React, Next.js, Vue, Nuxt, Angular, Svelte, Astro, jQuery, Bootstrap, Tailwind, WordPress, Shopify, Wix, Drupal, Django, Laravel, Rails, PHP, ASP.NET, Cloudflare, nginx, Apache, Vercel, Netlify and more.
-- **keywords**: counts words after removing Spanish and English stopwords (lists bundled in the code), numbers and words shorter than 3 letters. The title, headings and `meta keywords` weigh more, and singular/plural forms are merged (`zapatilla`/`zapatillas`). The website's language is detected from `<html lang>` or from the dominant stopwords.
-- **site_type**: a scoring system. Points for *web app*: a nearly empty `#root`/`#app`/`#__next` container, many JS bundles, `manifest.json`, a service worker, routes like `/login`, `/dashboard` or `/api/`, password forms. Points for *website*: lots of static text, paragraphs, classic navigation, a blog or articles, informational pages, a CMS generator. Confidence depends on the score gap (`--verbose` lists every signal).
-
-## Limitations
-
-Being honest about what a static analysis of the home page can and cannot know:
-
-- **The backend is only detected when it leaves clues** (headers like `X-Powered-By`, cookies like `laravel_session`, tokens like `csrfmiddlewaretoken`). Many sites hide them on purpose.
-- **Pure SPAs** (React/Vue compiled without SSR) usually ship the framework inside hashed bundles, so webscope may detect "web app" but not the specific framework. It does not download or analyze JavaScript bundles.
-- **It does not run JavaScript**: the summary and keywords come from the HTML the server returns. In an SPA the real content may not be there.
-- **The page count is approximate**: with a sitemap it counts the declared URLs (which may be outdated, hence the `~`); without one, only pages reachable through links from the home page, up to `--max-pages`. At most 25 child sitemaps are read.
-- **Simple language detection**: `<html lang>` or Spanish/English stopwords. For other languages, keywords may include stopwords.
-- Websites that block bots or require login/captcha return 403/503 errors or partial content.
-- `click`'s own messages for unknown options (for example `No such option`) and the word `Usage:` in the help stay in English.
-
-## Project structure
+## Estructura del proyecto
 
 ```
 webscope/
-├── pyproject.toml              # packaging (hatchling), dependencies, ruff and pytest
-├── .github/workflows/ci.yml    # ruff + pytest on Python 3.10, 3.11 and 3.12
+├── pyproject.toml              # empaquetado (hatchling), dependencias, ruff y pytest
+├── CHANGELOG.md
+├── docs/FINDINGS.md            # catálogo de reglas de hallazgos
+├── .github/workflows/ci.yml    # ruff + pytest en Python 3.10–3.13
 ├── src/webscope/
-│   ├── __init__.py             # version
-│   ├── __main__.py             # python -m webscope
-│   ├── cli.py                  # typer: arguments, language menu, errors, exit codes
-│   ├── core.py                 # wires network + analyzers into an AnalysisResult
-│   ├── i18n.py                 # es/en strings and t()
-│   ├── config.py               # saved language preference
-│   ├── fetcher.py              # requests: timeout, user agent, coded errors
-│   ├── crawler.py              # robots.txt, sitemap(s) and BFS crawl
-│   ├── parsing.py              # BeautifulSoup (lxml when available) and visible text
-│   ├── models.py               # immutable dataclasses (AnalysisResult, etc.)
-│   ├── report.py               # rich and JSON rendering; turns codes into text
-│   └── analyzers/
-│       ├── _text.py            # tokenizer and es/en stopwords
-│       ├── topic.py
-│       ├── tech.py
-│       ├── keywords.py
-│       └── site_type.py
+│   ├── cli.py                  # typer: flags, menú de idioma, errores, exit codes
+│   ├── core.py                 # orquesta red + analizadores en paralelo
+│   ├── fetcher.py              # [red] requests: home, redirecciones, recursos auxiliares
+│   ├── crawler.py              # [red] robots.txt, sitemaps y rastreo BFS
+│   ├── dnsinfo.py              # [red] dnspython: registros, PTR, ASN (Team Cymru)
+│   ├── tlsprobe.py             # [red] ssl/socket: un handshake TLS estándar
+│   ├── report.py               # texto (rich), Markdown y JSON; traduce códigos a texto
+│   ├── i18n.py                 # textos es/en y t()
+│   ├── models.py               # dataclasses inmutables
+│   ├── config.py · parsing.py
+│   └── analyzers/              # funciones puras, sin red
+│       ├── topic.py · category.py · keywords.py · site_type.py · tech.py
+│       ├── infra.py · tls.py · security.py · findings.py
+│       └── _text.py
 └── tests/
-    ├── fixtures/               # WordPress, React SPA, static site, Next.js + Tailwind
+    ├── fixtures/               # WordPress, WooCommerce, React SPA, estático, login,
+    │                           # JSON-LD (SaaS, blog), headers buenos y malos
     └── test_*.py
 ```
 
-## Tests and quality
+## Tests y calidad
 
 ```bash
-pytest          # 170 tests, no real requests
-ruff check .    # lint
-ruff format .   # formatting
+pytest            # 346 tests, sin ninguna request real
+ruff check .      # lint
+ruff format .     # formato
 ```
 
-- Tests **never make real requests**: the network is mocked with [`responses`](https://github.com/getsentry/responses), and a fixture blocks any attempt to open a socket.
-- They **never touch your real configuration**: each test uses a temporary folder through `WEBSCOPE_CONFIG_DIR`.
-- They cover each analyzer with fixtures, the crawler (sitemap, sitemap index, gzip, limits, robots.txt, BFS), fetcher errors, the CLI through `typer.testing.CliRunner` (language priority, menu with valid and invalid input, corrupt or unwritable config, `--json` without a menu, exit codes), key parity between languages, and that JSON keys stay in English.
+- **Sin red real**: `requests` se simula con [`responses`](https://github.com/getsentry/responses),
+  `dnspython` con un resolver falso y `tlsprobe` con handshakes simulados. Además un fixture
+  bloquea cualquier `connect`, `sendto` o `create_connection` real.
+- **Sin tocar tu configuración**: cada test usa una carpeta temporal vía `WEBSCOPE_CONFIG_DIR`.
+- Cubren cada analizador con fixtures (headers buenos y malos, WordPress/WooCommerce, SPA
+  React, sitio estático, login, JSON-LD de varios tipos, SPF/DMARC válidos e inválidos,
+  certificado a punto de vencer), el catálogo de hallazgos (ids y severidades estables,
+  texto en todos los idiomas, lenguaje prudente), la categoría (e-commerce, blog, SaaS,
+  indeterminada), el JSON (claves en inglés iguales en ambos idiomas, `schema_version`), el
+  Markdown, las **fallas parciales** (DNS caído, TLS caído o crawler roto → el reporte sale
+  igual) y la paridad de claves es/en.
 
 ## Roadmap
 
-- [ ] **More technologies**: add signatures to the table in `tech.py` (one line per technology) and, optionally, analyze JS bundles to detect frameworks in SPAs.
-- [ ] **More languages**: adding a language means adding one dictionary to [`i18n.py`](src/webscope/i18n.py) with the same keys; the menu, `--lang` and validation pick it up automatically, and the parity test flags any missing key.
-- [ ] **Markdown export** (`--markdown`) to paste the report into issues or docs.
-- [ ] **Basic SEO checks**: missing or duplicated titles and descriptions, image `alt` text, `canonical`, `hreflang`.
-- [ ] **Publish to PyPI** so it can be installed with `pip install webscope`.
+- [ ] **Más reglas** de hallazgos y más firmas de tecnologías y CDNs.
+- [ ] **Plugins**: cargar firmas, categorías y reglas desde archivos externos.
+- [ ] **Exportar a SARIF** para integrarlo con GitHub Code Scanning y otras herramientas.
+- [ ] **Comparar dos escaneos** (`webscope diff a.json b.json`) para ver qué cambió.
+- [ ] **Más idiomas**: un diccionario nuevo en [`i18n.py`](src/webscope/i18n.py) con las
+      mismas claves; el test de paridad avisa si falta alguna.
+- [ ] **Publicar en PyPI** para instalarlo con `pip install webscope`.
 
-## License
+## Licencia
 
 [MIT](LICENSE) © 2026 Alvaro Aramayo Chain
