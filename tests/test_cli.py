@@ -347,3 +347,81 @@ def test_python_dash_m_entry_point() -> None:
     )
     assert completed.returncode == 0
     assert f"webscope {__version__}" in completed.stdout
+
+
+# --- v2: flags nuevos ----------------------------------------------------------------
+
+
+@pytest.mark.usefixtures("full_site", "non_interactive")
+def test_default_output_has_v2_blocks() -> None:
+    result = invoke([URL, "--lang", "es", "--no-color"])
+    assert result.exit_code == 0, result.output
+    for title in ("GENERAL", "INFRAESTRUCTURA", "TLS", "SEGURIDAD VISIBLE", "HALLAZGOS"):
+        assert title in result.stdout
+    assert "Reconocimiento pasivo" in result.stdout
+
+
+@pytest.mark.usefixtures("full_site", "non_interactive")
+def test_brief_shows_only_general(fake_dns) -> None:
+    result = invoke([URL, "--lang", "en", "--brief"])
+    assert result.exit_code == 0
+    assert "GENERAL" in result.stdout
+    assert "INFRASTRUCTURE" not in result.stdout and "FINDINGS" not in result.stdout
+    assert fake_dns.queries == []
+
+
+@pytest.mark.usefixtures("full_site", "interactive")
+def test_markdown_output_never_prompts(isolated_env: Path) -> None:
+    result = invoke([URL, "--md", "--lang", "es"])
+    assert result.exit_code == 0
+    assert result.stdout.startswith("# 🔎 zapasrun.example")
+    assert "## HALLAZGOS" in result.stdout
+    assert MENU not in result.output
+    assert not (isolated_env / "config.json").exists()
+
+
+@pytest.mark.usefixtures("full_site", "non_interactive")
+def test_json_v2_sections() -> None:
+    result = invoke([URL, "--json", "--lang", "en"])
+    data = json.loads(result.stdout)
+    assert data["schema_version"] == "2.0"
+    assert data["scanned_at"].endswith("Z")
+    assert {"general", "infrastructure", "tls", "security", "findings"} <= data.keys()
+
+
+@pytest.mark.usefixtures("full_site", "non_interactive")
+def test_no_crawl_flag() -> None:
+    result = invoke([URL, "--lang", "es", "--no-crawl", "--no-color"])
+    assert result.exit_code == 0
+    assert "no contado (--no-crawl)" in result.stdout
+
+
+@pytest.mark.usefixtures("non_interactive")
+def test_json_and_md_together_is_usage_error() -> None:
+    result = invoke([URL, "--json", "--md", "--lang", "es"])
+    assert result.exit_code == 2
+    assert "--json y --md" in result.stderr
+
+
+@pytest.mark.usefixtures("non_interactive")
+@pytest.mark.parametrize("value", ["0", "-3"])
+def test_invalid_timeout_is_usage_error(value: str) -> None:
+    result = invoke([URL, "--timeout", value, "--lang", "en"])
+    assert result.exit_code == 2
+    assert "--timeout" in result.stderr
+
+
+@pytest.mark.parametrize(("lang", "expected"), [("es", "bug bounty"), ("en", "bug bounty")])
+def test_help_mentions_scope_and_new_flags(lang: str, expected: str) -> None:
+    text = ANSI_ESCAPE.sub("", invoke(["--help"], help_lang=lang).stdout)
+    assert expected in text
+    for flag in ("--brief", "--md", "--no-crawl", "--rdap", "--timeout"):
+        assert flag in text
+
+
+@pytest.mark.usefixtures("wordpress_site", "non_interactive")
+def test_partial_failure_keeps_exit_code_zero() -> None:
+    # DNS vacío y TLS caído (fixtures por defecto): el reporte sale igual.
+    result = invoke([URL, "--lang", "en", "--no-color"])
+    assert result.exit_code == 0
+    assert "not available (could not connect to the TLS port)" in result.stdout

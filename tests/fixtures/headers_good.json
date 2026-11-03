@@ -1,0 +1,10 @@
+{
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'nonce-r4nd0m'; frame-ancestors 'none'",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), geolocation=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Server": "nginx",
+  "Set-Cookie": "__Host-session=abc; Path=/; Secure; HttpOnly; SameSite=Lax"
+}

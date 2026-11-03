@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Sign in · Acme Portal</title>
+  <meta name="description" content="Acme Portal">
+</head>
+<body>
+  <main>
+    <h1>Sign in to Acme Portal</h1>
+    <form action="http://login.acme.example/session" method="post">
+      <input type="email" name="email" autocomplete="username">
+      <input type="password" name="password">
+      <button>Sign in</button>
+    </form>
+    <form action="https://auth.partner.example/sso" method="post">
+      <input type="password" name="pin" autocomplete="current-password">
+    </form>
+    <a href="/api/v1/status">Status</a>
+    <a href="https://docs.acme.example/graphql">GraphQL docs</a>
+    <img src="http://acme.example/logo.png" alt="logo">
+    <a href="https://help.acme.example" target="_blank" rel="noopener">Help</a>
+    <a href="https://blog.acme.example" target="_blank">Blog</a>
+  </main>
+</body>
+</html>

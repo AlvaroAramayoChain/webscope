@@ -1,0 +1,8 @@
+{
+  "Strict-Transport-Security": "max-age=300",
+  "Content-Security-Policy": "default-src * 'unsafe-inline' 'unsafe-eval'",
+  "Server": "Apache/2.4.41 (Ubuntu)",
+  "X-Powered-By": "PHP/8.1.2",
+  "X-AspNet-Version": "4.0.30319",
+  "Set-Cookie": "PHPSESSID=xyz; path=/"
+}

@@ -1,19 +1,24 @@
 import io
 import json
+import re
 
 import pytest
 from rich.console import Console
 
+from webscope import __version__
 from webscope.fetcher import FetchError
+from webscope.i18n import t
 from webscope.models import AnalysisResult, PageCount, Signal, SiteTypeResult, Technology
 from webscope.report import (
     format_error,
     format_pages,
     format_site_type,
+    format_summary,
     format_technologies,
     render,
     to_dict,
     to_json,
+    to_markdown,
 )
 
 
@@ -157,3 +162,122 @@ def test_to_json_is_valid_and_keeps_accents() -> None:
     text = to_json(make_result(summary="Envío gratis"), "es")
     assert json.loads(text)["summary"] == "Envío gratis"
     assert "Envío" in text
+
+
+# --- v2: bloques, Markdown y JSON ---------------------------------------------------
+
+
+@pytest.fixture
+def full_result(full_site: object) -> AnalysisResult:
+    from webscope.core import analyze
+
+    return analyze("zapasrun.example")
+
+
+@pytest.mark.parametrize(
+    ("lang", "titles"),
+    [
+        ("es", ("GENERAL", "INFRAESTRUCTURA", "TLS", "SEGURIDAD VISIBLE", "HALLAZGOS")),
+        ("en", ("GENERAL", "INFRASTRUCTURE", "TLS", "VISIBLE SECURITY", "FINDINGS")),
+    ],
+)
+def test_full_report_has_every_block(full_result: AnalysisResult, lang: str, titles: tuple) -> None:
+    text = render_text(full_result, lang)
+    for title in titles:
+        assert title in text
+    assert "AS13335 Cloudflare, Inc. · US" in text
+    assert "Let's Encrypt (R11)" in text
+    assert ("Reconocimiento pasivo" if lang == "es" else "Passive reconnaissance") in text
+
+
+def test_findings_use_translated_severity(full_result: AnalysisResult) -> None:
+    assert "[MEDIO] Falta Content-Security-Policy" in render_text(full_result, "es")
+    assert "[MEDIUM] Missing Content-Security-Policy" in render_text(full_result, "en")
+
+
+def test_verbose_shows_evidence_and_recommendation(full_result: AnalysisResult) -> None:
+    text = render_text(full_result, "en", verbose=True)
+    assert "evidence: Content-Security-Policy: -" in text
+    assert "→ Define a restrictive CSP" in text
+    assert "HDR-CSP-MISSING" in text
+
+
+def test_report_fits_100_columns(full_result: AnalysisResult) -> None:
+    buffer = io.StringIO()
+    render(full_result, "es", Console(file=buffer, width=100, color_system=None), verbose=True)
+    assert max(len(line) for line in buffer.getvalue().splitlines()) <= 100
+
+
+def test_unavailable_block_shows_reason() -> None:
+    result = make_result(unavailable={"tls": "tls_timeout"})
+    assert "no disponible (TLS sin respuesta)" in render_text(result, "es")
+
+
+def test_brief_only_shows_general(full_result: AnalysisResult) -> None:
+    from dataclasses import replace
+
+    text = render_text(replace(full_result, brief=True), "es")
+    assert "GENERAL" in text and "INFRAESTRUCTURA" not in text and "HALLAZGOS" not in text
+
+
+def test_summary_has_category_prefix() -> None:
+    from webscope.models import CategoryResult, TopicResult
+
+    topic = TopicResult("Zapatillas con envío gratis", CategoryResult("ecommerce", "high"))
+    result = make_result(summary="Zapatillas con envío gratis", topic=topic)
+    assert (
+        format_summary(result, "es") == "Tienda online (e-commerce) — Zapatillas con envío gratis"
+    )
+    assert format_summary(result, "en").startswith("Online store (e-commerce) — ")
+    unknown = TopicResult("Algo", CategoryResult("unknown", "low"))
+    assert format_summary(make_result(summary="Algo", topic=unknown), "es") == "Algo"
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_markdown_report(full_result: AnalysisResult, lang: str) -> None:
+    md = to_markdown(full_result, lang)
+    assert md.startswith("# 🔎 zapasrun.example")
+    assert ("## INFRAESTRUCTURA" if lang == "es" else "## INFRASTRUCTURE") in md
+    assert "|---|---|" in md
+    assert "`HDR-CSP-MISSING`" in md
+    assert md.rstrip().endswith(t("notice.passive", lang))
+
+
+def test_markdown_escapes_pipes() -> None:
+    md = to_markdown(make_result(summary="a | b"), "es")
+    assert r"a \| b" in md
+
+
+def _keys(value: object, path: str = "") -> set[str]:
+    if isinstance(value, dict):
+        found = set()
+        for key, child in value.items():
+            found.add(key)
+            found |= _keys(child, f"{path}.{key}")
+        return found
+    if isinstance(value, list):
+        return set().union(*(_keys(item, path) for item in value)) if value else set()
+    return set()
+
+
+def test_json_schema_v2(full_result: AnalysisResult) -> None:
+    data = json.loads(to_json(full_result, "es"))
+    assert data["schema_version"] == "2.0"
+    assert data["webscope_version"] == __version__
+    for section in ("general", "infrastructure", "tls", "security", "findings", "unavailable"):
+        assert section in data
+    finding = data["findings"][0]
+    assert set(finding) == {"id", "severity", "title", "evidence", "recommendation"}
+    assert data["infrastructure"]["asn"]["104.16.1.1"]["asn"] == 13335
+    assert data["general"]["technologies"][0].keys() == {"name", "category", "version"}
+
+
+def test_json_keys_are_english_and_identical_between_languages(full_result: AnalysisResult) -> None:
+    spanish, english = to_dict(full_result, "es"), to_dict(full_result, "en")
+    keys_es, keys_en = _keys(spanish), _keys(english)
+    # Las claves de nivel de datos de usuario (IPs, nombres de header) se excluyen.
+    assert keys_es == keys_en
+    words = {k for k in keys_es if re.fullmatch(r"[a-z_]+", k)}
+    assert not words & {"resumen", "categoria", "hallazgos", "infraestructura", "seguridad"}
+    assert spanish["findings"][0]["id"] == english["findings"][0]["id"]
+    assert spanish["findings"][0]["title"] != english["findings"][0]["title"]

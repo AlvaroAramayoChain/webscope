@@ -80,3 +80,86 @@ def test_signatures_are_consistent() -> None:
 
 def test_nothing_detected_for_empty_input() -> None:
     assert detect_technologies("") == ()
+
+
+# --- v2: versiones y tecnologías nuevas ----------------------------------------------
+
+
+def versions(html: str, headers: dict[str, str] | None = None) -> dict[str, str | None]:
+    return {tech.name: tech.version for tech in detect_technologies(html, headers)}
+
+
+def test_versions_from_wordpress_fixture(load_fixture: Callable[[str], str]) -> None:
+    found = versions(load_fixture("wordpress.html"))
+    assert found["WordPress"] == "6.6.2"
+    assert found["jQuery"] == "3.7.1"
+
+
+def test_woocommerce_fixture_detects_stack_and_versions(load_fixture: Callable[[str], str]) -> None:
+    found = versions(load_fixture("woocommerce.html"))
+    assert found["WooCommerce"] == "8.5.2"
+    assert found["Bootstrap"] == "5.3.2"
+    assert found["WordPress"] == "6.4.3"
+    assert "Google Tag Manager" in found
+
+
+@pytest.mark.parametrize(
+    ("headers", "name", "version"),
+    [
+        ({"Server": "nginx/1.25.3"}, "nginx", "1.25.3"),
+        ({"Server": "Apache/2.4.58 (Ubuntu)"}, "Apache", "2.4.58"),
+        ({"X-Powered-By": "PHP/8.1.2"}, "PHP", "8.1.2"),
+        ({"Server": "Werkzeug/3.0.1 Python/3.12.1"}, "Flask", "3.0.1"),
+        ({"X-AspNet-Version": "4.0.30319"}, "ASP.NET", "4.0.30319"),
+    ],
+)
+def test_versions_from_headers(headers: dict[str, str], name: str, version: str) -> None:
+    assert versions("<html></html>", headers)[name] == version
+
+
+@pytest.mark.parametrize(
+    ("snippet", "expected"),
+    [
+        ('<div class="et_pb_section"></div>', "Divi"),
+        (
+            '<link href="/wp-content/plugins/elementor/assets/css/frontend.min.css?ver=3.18.0">',
+            "Elementor",
+        ),
+        ('<script type="text/x-magento-init">{}</script>', "Magento"),
+        ('<meta name="generator" content="PrestaShop">', "PrestaShop"),
+        ("<script>window.__remixContext = {}</script>", "Remix"),
+        ('<a data-sveltekit-preload-data href="/">x</a>', "SvelteKit"),
+        (
+            '<script src="https://www.google-analytics.com/analytics.js"></script>',
+            "Google Analytics",
+        ),
+        ("<script>fbq('init', '123');</script>", "Meta Pixel"),
+        ('<script src="https://static.hotjar.com/c/hotjar-1.js"></script>', "Hotjar"),
+        ('<div class="g-recaptcha"></div>', "reCAPTCHA"),
+        ('<script src="https://js.stripe.com/v3/"></script>', "Stripe"),
+        ('<div class="cf-turnstile"></div>', "Cloudflare Turnstile"),
+        ('<meta name="generator" content="Astro v4.2.1">', "Astro"),
+    ],
+)
+def test_new_technologies(snippet: str, expected: str) -> None:
+    assert expected in names(f"<html><body>{snippet}</body></html>")
+
+
+def test_spring_and_java_from_cookie() -> None:
+    found = names(
+        "<html></html>", {"X-Application-Context": "app:8080", "Set-Cookie": "JSESSIONID=1"}
+    )
+    assert {"Spring", "Java"} <= set(found)
+
+
+def test_github_pages_is_case_sensitive() -> None:
+    assert "GitHub Pages" in names("<html></html>", {"Server": "GitHub.com"})
+    assert "GitHub Pages" not in names("<html></html>", {"Server": "github.com"})
+
+
+def test_every_signature_version_regex_has_a_group() -> None:
+    import re
+
+    for sig in SIGNATURES:
+        for _, pattern in sig.versions:
+            assert re.compile(pattern).groups >= 1, sig.name

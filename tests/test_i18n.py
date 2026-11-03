@@ -69,7 +69,7 @@ def test_all_static_keys_used_in_code_exist() -> None:
 
 
 def test_all_signal_and_event_codes_are_translated() -> None:
-    signals = _codes(r"""Signal\(\s*["'](\w+)["']""")
+    signals = _codes(r"""\bSignal\(\s*["'](\w+)["']""")
     events = _codes(r"""on_event\(\s*["'](\w+)["']""")
     assert signals and events
     for code in signals:
