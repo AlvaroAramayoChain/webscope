@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "webscope"
+dynamic = ["version"]
+description = "CLI que analiza una URL y resume de qué trata, cuántas páginas tiene, qué tecnologías usa, sus palabras clave y si es un sitio o una app web."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Alvaro Aramayo Chain" }]
+keywords = ["cli", "web", "analyzer", "crawler", "technology-detection", "seo"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Natural Language :: Spanish",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Site Management",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+    "rich>=13.0",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+fast = ["lxml>=5.0"]
+dev = [
+    "pytest>=8.0",
+    "responses>=0.25",
+    "ruff>=0.5",
+    "lxml>=5.0",
+]
+
+[project.scripts]
+webscope = "webscope.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/AlvaroAramayoChain/webscope"
+Issues = "https://github.com/AlvaroAramayoChain/webscope/issues"
+
+[tool.hatch.version]
+path = "src/webscope/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/webscope"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF001"]
