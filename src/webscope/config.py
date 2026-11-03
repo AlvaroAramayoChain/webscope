@@ -11,6 +11,7 @@ funcionando y simplemente no recuerda la preferencia.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import locale
 import os
@@ -70,10 +71,8 @@ def save_language(lang: str) -> bool:
 def system_language() -> str:
     """Idioma del sistema: ``es`` si la configuración regional empieza con ``es``."""
     candidates = [os.environ.get(name, "") for name in _LOCALE_ENV_VARS]
-    try:
+    with contextlib.suppress(ValueError):
         candidates.append(locale.getlocale()[0] or "")
-    except ValueError:
-        pass
     for value in candidates:
         if not value or value in ("C", "POSIX"):
             continue
