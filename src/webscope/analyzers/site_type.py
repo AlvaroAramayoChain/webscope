@@ -97,10 +97,12 @@ def _site_signals(page: _Page) -> Iterator[Signal]:
     if len(paragraphs) >= 5:
         yield Signal("paragraphs", "site", 2)
     nav_links = sum(len(nav.find_all("a", href=True)) for nav in page.soup.find_all("nav"))
-    if nav_links >= 5:
+    if nav_links >= 5 or len(page.links) >= 30:
         yield Signal("nav_links", "site", 2)
     elif len(page.links) >= 15:
         yield Signal("nav_links", "site", 1)
+    if len(page.soup.find_all(["h2", "h3"])) >= 6:
+        yield Signal("headings", "site", 1)
     if len(page.soup.find_all("article")) >= 2 or any(_BLOG_RE.search(h) for h in page.links):
         yield Signal("blog", "site", 2)
     info = {m.group(1).lower() for h in page.links if (m := _INFO_RE.search(h))}
